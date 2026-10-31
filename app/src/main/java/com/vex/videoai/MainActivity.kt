@@ -117,17 +117,20 @@ class MainActivity:ComponentActivity(){
  val audioPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
   if(uri!=null)scope.launch{
    busy=true;notice=""
-   val extension=MimeTypeMap.getSingleton().getExtensionFromMimeType(context.contentResolver.getType(uri))?:"wav"
-   val audioFile=File(context.cacheDir,"vex-scene-audio-${System.currentTimeMillis()}.${extension}")
    try{
+    val project=active?:error("Open a project first.")
+    val scene=project.scenes.getOrNull(sceneIndex)?:error("Select a scene first.")
+    val extension=MimeTypeMap.getSingleton().getExtensionFromMimeType(context.contentResolver.getType(uri))?:"wav"
+    val audioDir=File(context.filesDir,"vex-video-projects/${project.id}").apply{mkdirs()}
+    val audioFile=File(audioDir,"${scene.id}.${extension}")
     val input=context.contentResolver.openInputStream(uri)?:error("Could not open the selected audio file.")
     input.use{stream->audioFile.outputStream().use{out->stream.copyTo(out)}}
     val whisperAsset=ModelCatalog.assets.first{it.id=="whisper_tiny_en"}
     val cues=WhisperLocalEngine(context).transcribeEnglish(audioFile,modelManager.fileFor(whisperAsset))
-    updateActive{p->p.copy(scenes=p.scenes.mapIndexed{i,scene->if(i==sceneIndex)scene.copy(subtitles=cues)else scene})}
-    notice=if(tr)"Whisper ${cues.size} altyazı satırı oluşturdu." else "Whisper created ${cues.size} subtitle cues."
+    updateActive{p->p.copy(scenes=p.scenes.mapIndexed{i,current->if(i==sceneIndex)current.copy(subtitles=cues,voiceoverPath=audioFile.absolutePath)else current})}
+    notice=if(tr)"Whisper ${cues.size} altyazı satırı oluşturdu; ses dosyası sahneye eklendi." else "Whisper created ${cues.size} subtitle cues and attached the voiceover."
    }catch(e:Exception){notice=e.message?:"Whisper transcription failed."}
-   finally{audioFile.delete();busy=false}
+   finally{busy=false}
   }
  }
 
@@ -148,7 +151,7 @@ class MainActivity:ComponentActivity(){
     Media3VideoExporter(context).export(projectToRender,temp){renderProgress=it}
     val output=context.contentResolver.openOutputStream(uri)?:error("Could not write to the selected destination.")
     output.use{stream->temp.inputStream().use{input->input.copyTo(stream)}}
-    notice=if(tr)"MP4 hazır. Bu aşamada video sessizdir; altyazılar görüntüye işlenir." else "MP4 exported. This first render is silent; subtitles are burned into the frames."
+    val withAudio=projectToRender.scenes.all{it.voiceoverPath.isNotBlank()&&File(it.voiceoverPath).exists()};notice=if(withAudio)if(tr)"MP4 hazır: seslendirme ve altyazılar eklendi." else "MP4 exported with per-scene voiceovers and burned-in subtitles." else if(tr)"MP4 hazır ancak tüm sahnelere ses dosyası eklenmediği için sessiz dışa aktarıldı." else "MP4 exported silently. Attach a voiceover to every scene to include audio."
    }catch(e:Exception){notice=e.message?:"MP4 export failed."}
    finally{temp.delete();busy=false}
   }
@@ -210,7 +213,7 @@ class MainActivity:ComponentActivity(){
         item{Text("Camera: ${selectedScene.cameraMovement} • Transition: ${selectedScene.transition}",color=Muted,fontSize=11.sp)}
         item{Section(if(tr)"KATMANLAR" else "CANVAS LAYERS",if(tr)"Arka plan ve ön plan öğeleri" else "Background and foreground elements");selectedScene.layers.forEach{layer->Row(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){Text(if(layer.kind=="background")"BG" else "FG",color=Purple,fontSize=10.sp,fontWeight=FontWeight.Bold);Text(layer.name,Modifier.weight(1f).padding(start=9.dp),color=Color.White,fontSize=12.sp);TextButton(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers.filterNot{it.id==layer.id}))}){Text(if(tr)"Sil" else "Remove",color=Muted)}}};Button(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers+SceneLayer(name="New visual element",kind="foreground")))},colors=ButtonDefaults.buttonColors(containerColor=Panel)){Icon(Icons.Rounded.Add,null);Text(if(tr)" Katman ekle" else " Add layer")}}
         item{Button(onClick={scope.launch{busy=true;notice="";try{val starter=ModelCatalog.assets.first { it.id=="qwen3_06b" };val gguf=modelManager.fileFor(starter);val fresh=if(gguf.exists())OnDeviceLlmClient(context).createStoryboard(active,gguf,threads=4) else LocalLlmClient().createStoryboard(active,LlmSettings(endpoint,model,apiKey));saveProject(active.copy(scenes=fresh));sceneIndex=0;notice=if(tr)"AI storyboard hazır." else "AI storyboard generated."}catch(e:Exception){notice=e.message?: "Generation failed"}finally{busy=false}}},modifier=Modifier.fillMaxWidth(),enabled=!busy,colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp) else Icon(Icons.Rounded.AutoAwesome,null);Text(if(tr)"  Yerel LLM ile storyboard üret" else "  Generate storyboard with local LLM")}}
-        item{Button(onClick={videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_-]"),"_").take(40).ifBlank{"vex-video"}+".mp4")},modifier=Modifier.fillMaxWidth(),enabled=!busy&&active.scenes.isNotEmpty(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF34303D))){Icon(Icons.Rounded.Movie,null);Text(if(tr)"  Sessiz MP4 dışa aktar" else "  Export silent MP4")};if(busy&&renderProgress>0)Text("Render: ${renderProgress}%",color=Muted,fontSize=11.sp)}
+        item{Button(onClick={videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_-]"),"_").take(40).ifBlank{"vex-video"}+".mp4")},modifier=Modifier.fillMaxWidth(),enabled=!busy&&active.scenes.isNotEmpty(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF34303D))){Icon(Icons.Rounded.Movie,null);Text(if(tr)"  MP4 dışa aktar" else "  Export MP4")};if(busy&&renderProgress>0)Text("Render: ${renderProgress}%",color=Muted,fontSize=11.sp)}
         if(notice.isNotBlank())item{Text(notice,color=if(notice.contains("generated")||notice.contains("hazır"))Color(0xFF9BE7B9) else Color(0xFFE6B66D),fontSize=12.sp)}
         item{Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF21182E))){Column(Modifier.padding(12.dp)){Text(if(tr)"Sonraki motorlar" else "Next production engines",color=Purple,fontWeight=FontWeight.Bold);Text("Kokoro TTS • Whisper subtitles • MP4 export",color=Color.White,fontSize=12.sp);Text(if(tr)"Henüz gerçek runtime bağlı değil; sahte tamamlandı durumu gösterilmez." else "Native runtimes are not connected yet; no fake completion status is shown.",color=Muted,fontSize=10.sp)}}}
        }

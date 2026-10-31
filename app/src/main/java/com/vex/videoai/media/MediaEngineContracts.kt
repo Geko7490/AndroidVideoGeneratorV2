@@ -11,5 +11,5 @@ object EngineCatalog { val initial=listOf(
  EngineDescriptor("llama","llama.cpp","On-device GGUF storyboard generation",RuntimeState.NOT_INSTALLED,"Download a GGUF model in Model Center to activate"),
  EngineDescriptor("kokoro","Kokoro TTS","English voice generation",RuntimeState.NOT_INSTALLED,"ONNX model and voice assets required"),
  EngineDescriptor("whisper","Whisper","English transcription and word timing",RuntimeState.NOT_INSTALLED,"Download the tiny.en model in Model Center to activate"),
- EngineDescriptor("renderer","Video Renderer","Layered image-sequence MP4 export",RuntimeState.READY,"Media3 renderer connected; voiceover audio mixing is still pending")
+ EngineDescriptor("renderer","Video Renderer","Layered image-sequence MP4 export",RuntimeState.READY,"Media3 renderer supports scene images, burned subtitles and per-scene voiceover tracks when all scenes have audio")
 ) }

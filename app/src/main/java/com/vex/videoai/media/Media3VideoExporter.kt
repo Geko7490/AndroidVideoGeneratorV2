@@ -43,7 +43,16 @@ class Media3VideoExporter(context:Context) {
                 EditedMediaItem.Builder(mediaItem).setFrameRate(30).build()
             }
             val sequence=EditedMediaItemSequence.withVideoFrom(items)
-            val composition=Composition.Builder(sequence).build()
+            val audioFiles=project.scenes.map { File(it.voiceoverPath) }
+            val composition=if(audioFiles.all { it.exists()&&it.length()>0L }) {
+                val audioItems=audioFiles.map { file ->
+                    EditedMediaItem.Builder(MediaItem.Builder().setUri(file.toUri()).build()).build()
+                }
+                val audioSequence=EditedMediaItemSequence.withAudioFrom(audioItems)
+                Composition.Builder(sequence,audioSequence).build()
+            } else {
+                Composition.Builder(sequence).build()
+            }
             withContext(Dispatchers.Main.immediate) {
                 suspendCancellableCoroutine { continuation ->
                     val transformer=Transformer.Builder(app).build()
