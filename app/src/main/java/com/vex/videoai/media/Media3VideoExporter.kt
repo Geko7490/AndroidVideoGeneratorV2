@@ -156,7 +156,7 @@ class Media3VideoExporter(context:Context) {
                 "text" -> AndroidColor.WHITE
                 else -> AndroidColor.rgb(95+(layerIndex*17%100),65+(layerIndex*13%90),135+(layerIndex*11%100))
             }
-            val asset=if(layer.assetPath.isNotBlank())BitmapFactory.decodeFile(layer.assetPath) else null
+            val asset=if(layer.assetPath.isNotBlank())decodeLayerAsset(File(layer.assetPath),(width*.58f*layer.scale.coerceIn(.1f,2f)).toInt().coerceAtLeast(1),(height*.7f).toInt()) else null
             if(asset!=null) {
                 paint.color=AndroidColor.WHITE
                 val targetWidth=(width*.58f*layer.scale.coerceIn(.1f,2f)).coerceAtMost(width*.9f)
@@ -209,6 +209,15 @@ class Media3VideoExporter(context:Context) {
         return bitmap
     }
 
+    private fun decodeLayerAsset(file:File,targetWidth:Int,targetHeight:Int):Bitmap? {
+        if(!file.isFile)return null
+        val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true}
+        BitmapFactory.decodeFile(file.absolutePath,bounds)
+        if(bounds.outWidth<=0||bounds.outHeight<=0)return null
+        var sample=1
+        while(bounds.outWidth/sample>targetWidth*2||bounds.outHeight/sample>targetHeight*2)sample*=2
+        return BitmapFactory.decodeFile(file.absolutePath,BitmapFactory.Options().apply{inSampleSize=sample.coerceAtLeast(1);inPreferredConfig=Bitmap.Config.ARGB_8888})
+    }
     private fun wrapText(text:String,paint:Paint,maxWidth:Float):List<String> {
         val words=text.split(Regex("\\s+"))
         val lines=mutableListOf<String>();var current=""
