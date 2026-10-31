@@ -46,6 +46,6 @@ class OnDeviceLlmClient(private val context:Context) {
         }}
         require(parsed.isNotEmpty()) { "The on-device model returned no usable scenes." }
         require(parsed.all{scene->scene.narration.all{it.code<128}&&scene.dialogue.all{it.code<128}&&scene.visualDescription.all{it.code<128}&&scene.title.all{it.code<128}}) { "The model generated non-English video content. Retry; output must be English." }
-        SceneDurationNormalizer.normalize(parsed,targetDurationSeconds)
+        return SceneDurationNormalizer.normalize(parsed,targetDurationSeconds)
     }
 }

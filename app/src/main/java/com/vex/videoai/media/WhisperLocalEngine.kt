@@ -11,7 +11,7 @@ import java.io.File
 class WhisperLocalEngine(private val context:Context) {
     suspend fun transcribeEnglish(audioFile:File,modelFile:File):List<SubtitleLine> = transcribeEnglishBatch(listOf(audioFile),modelFile).first()
 
-    suspend fun transcribeEnglishBatch(audioFiles:List<File>,modelFile:File,onProgress:(Int,Int)->Unit={}):List<List<SubtitleLine>> = withContext(Dispatchers.IO) {
+    suspend fun transcribeEnglishBatch(audioFiles:List<File>,modelFile:File,onProgress:(Int,Int)->Unit={_,_->}):List<List<SubtitleLine>> = withContext(Dispatchers.IO) {
         require(audioFiles.isNotEmpty()) { "There are no voiceover files to transcribe." }
         require(audioFiles.all{it.exists()&&it.length()>0L}) { "One or more voiceover files are missing." }
         require(modelFile.exists()&&modelFile.length()>0L) { "Download Whisper tiny.en from Model Center first." }
