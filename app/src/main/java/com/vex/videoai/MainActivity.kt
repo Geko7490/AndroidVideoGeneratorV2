@@ -130,7 +130,8 @@ class MainActivity:ComponentActivity(){
       if(projects.isEmpty())item{Text(if(tr)"Henüz proje yok." else "No projects yet.",color=Muted)}
       items(projects,key={it.id}){p->Card(Modifier.fillMaxWidth().clickable{goEditor(p)},colors=CardDefaults.cardColors(containerColor=Panel)){Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Rounded.Movie,null,tint=Purple);Column(Modifier.weight(1f).padding(start=10.dp)){Text(p.title,color=Color.White,fontWeight=FontWeight.SemiBold);Text("${p.category} • ${p.scenes.size} scenes • ${p.aspectRatio}",color=Muted,fontSize=11.sp)};IconButton(onClick={store.delete(p.id);projects.removeAll{it.id==p.id}}){Icon(Icons.Rounded.Delete,null,tint=Muted)}}}}
      }
-     "models"->ModelCenterScreen(tr)\n     "settings"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+     "models"->ModelCenterScreen(tr)
+     "settings"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
       Section(if(tr)"YEREL LLM" else "LOCAL LLM",if(tr)"OpenAI uyumlu yerel sunucu" else "OpenAI-compatible local server")
       Text(if(tr)"Örnek: llama.cpp server, LM Studio veya Ollama OpenAI uyumlu endpoint." else "Example: llama.cpp server, LM Studio or an OpenAI-compatible Ollama endpoint.",color=Muted,fontSize=12.sp)
       OutlinedTextField(endpoint,{endpoint=it},Modifier.fillMaxWidth(),label={Text("Chat completions URL")},colors=fieldColors())
