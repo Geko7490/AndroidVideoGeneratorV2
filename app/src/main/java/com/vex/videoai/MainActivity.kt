@@ -4,232 +4,186 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ClosedCaption
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Timeline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import com.vex.videoai.ai.LlmSettings
+import com.vex.videoai.ai.LocalLlmClient
+import com.vex.videoai.data.ProjectStore
+import com.vex.videoai.data.SceneLayer
+import com.vex.videoai.data.VideoProject
+import com.vex.videoai.data.VideoScene
+import com.vex.videoai.media.EngineCatalog
+import kotlinx.coroutines.launch
 
-private val Bg = Color(0xFF101014)
-private val Panel = Color(0xFF1B1A22)
-private val Purple = Color(0xFFA855F7)
-private val Muted = Color(0xFFAAA6B5)
-
-private data class Category(val id: String, val en: String, val tr: String, val subEn: String, val subTr: String, val icon: String)
-private val categories = listOf(
-    Category("horror","Horror","Korku","Dark stories, suspense and paranormal","Karanlık hikâyeler, gerilim ve paranormal","◉"),
-    Category("educational","Educational","Eğitim","Explain topics with visual storytelling","Konuları görsel anlatımla açıkla","✦"),
-    Category("story","Story","Hikâye","Characters, dialogue and emotional arcs","Karakterler, diyaloglar ve duygusal akış","◇"),
-    Category("mystery","Mystery","Gizem","Unsolved events, clues and theories","Çözülememiş olaylar, ipuçları ve teoriler","⌕"),
-    Category("history","History","Tarih","Historical events and biographies","Tarihî olaylar ve biyografiler","◷"),
-    Category("documentary","Documentary","Belgesel","Narrative non-fiction and real subjects","Gerçek konular ve anlatımlı içerikler","▤"),
-    Category("comedy","Comedy","Komedi","Funny situations and short sketches","Komik durumlar ve kısa skeçler","☺"),
-    Category("facts","Facts / Top 10","Bilgiler / Top 10","Rankings and surprising discoveries","Sıralamalar ve şaşırtıcı keşifler","≡"),
-    Category("motivational","Motivational","Motivasyon","Inspiring stories and ideas","İlham veren hikâyeler ve fikirler","↗")
+private val Bg=Color(0xFF101014)
+private val Panel=Color(0xFF1B1A22)
+private val Purple=Color(0xFFA855F7)
+private val Muted=Color(0xFFAAA6B5)
+private data class Category(val id:String,val en:String,val tr:String,val subEn:String,val subTr:String,val icon:String)
+private val categories=listOf(
+ Category("horror","Horror","Korku","Suspense and paranormal","Gerilim ve paranormal","◉"),
+ Category("educational","Educational","Eğitim","Visual explanations","Görsel anlatımlar","✦"),
+ Category("story","Story","Hikâye","Characters and emotional arcs","Karakterler ve duygusal akış","◇"),
+ Category("mystery","Mystery","Gizem","Clues and theories","İpuçları ve teoriler","⌕"),
+ Category("history","History","Tarih","Events and biographies","Olaylar ve biyografiler","◷"),
+ Category("documentary","Documentary","Belgesel","Real-world subjects","Gerçek konular","▤"),
+ Category("comedy","Comedy","Komedi","Sketches and punchlines","Skeçler ve espriler","☺"),
+ Category("facts","Facts / Top 10","Bilgiler / Top 10","Rankings and discoveries","Sıralamalar ve keşifler","≡"),
+ Category("motivational","Motivational","Motivasyon","Inspiring stories","İlham veren hikâyeler","↗")
 )
-private data class Draft(val title: String, val category: String, val duration: String, val ratio: String)
 
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent { VideoAiHome() }
-    }
+class MainActivity:ComponentActivity(){
+ override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{VexVideoApp()}}
 }
 
-@Composable
-private fun VideoAiHome() {
-    var lang by rememberSaveable { mutableStateOf("en") }
-    var categoryId by rememberSaveable { mutableStateOf("horror") }
-    var prompt by rememberSaveable { mutableStateOf("") }
-    var duration by rememberSaveable { mutableStateOf("45s") }
-    var ratio by rememberSaveable { mutableStateOf("9:16") }
-    var style by rememberSaveable { mutableStateOf("Cinematic") }
-    var created by rememberSaveable { mutableStateOf(false) }
-    val drafts = remember { mutableStateListOf<Draft>() }
-    val tr = lang == "tr"
-    val category = categories.first { it.id == categoryId }
+@Composable private fun VexVideoApp(){
+ val context= LocalContext.current
+ val store= remember { ProjectStore(context) }
+ val prefs= remember { context.getSharedPreferences("vex_video_settings",0) }
+ val projects= remember { mutableStateListOf<VideoProject>().apply { addAll(store.getAll()) } }
+ var language by rememberSaveable { mutableStateOf("en") }
+ var page by rememberSaveable { mutableStateOf("home") }
+ var category by rememberSaveable { mutableStateOf("horror") }
+ var idea by rememberSaveable { mutableStateOf("") }
+ var duration by rememberSaveable { mutableStateOf("45s") }
+ var ratio by rememberSaveable { mutableStateOf("9:16") }
+ var style by rememberSaveable { mutableStateOf("Cinematic") }
+ var activeProjectId by rememberSaveable { mutableStateOf("") }
+ var sceneIndex by rememberSaveable { mutableIntStateOf(0) }
+ var endpoint by rememberSaveable { mutableStateOf(prefs.getString("llm_endpoint","http://127.0.0.1:8080/v1/chat/completions")?:"") }
+ var model by rememberSaveable { mutableStateOf(prefs.getString("llm_model","local-model")?:"local-model") }
+ var apiKey by rememberSaveable { mutableStateOf("") }
+ var busy by remember { mutableStateOf(false) }
+ var notice by remember { mutableStateOf("") }
+ val scope= rememberCoroutineScope()
+ val tr=language=="tr"
+ val active=projects.firstOrNull { it.id==activeProjectId }
+ val selectedScene=active?.scenes?.getOrNull(sceneIndex)
 
-    MaterialTheme(colorScheme = darkColorScheme(primary = Purple, background = Bg, surface = Panel, onSurface = Color.White)) {
-        Scaffold(containerColor = Bg) { inset ->
-            LazyColumn(
-                Modifier.fillMaxSize().padding(inset),
-                contentPadding = PaddingValues(20.dp),
-                verticalArrangement = Arrangement.spacedBy(17.dp)
-            ) {
-                item {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Column {
-                            Text("VEX VIDEO AI", color = Purple, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                            Text(if (tr) "AI içerik stüdyosu" else "AI Content Studio", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            LangButton("TR", tr) { lang = "tr" }
-                            LangButton("EN", !tr) { lang = "en" }
-                        }
-                    }
-                }
-                item {
-                    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF21182E)), shape = RoundedCornerShape(17.dp)) {
-                        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.AutoAwesome, null, tint = Purple)
-                                Text(if (tr) "  Fikrini videoya dönüştür" else "  Turn an idea into a video", color = Color.White, fontWeight = FontWeight.SemiBold)
-                            }
-                            Text(if (tr) "Senaryo, sahne planı, seslendirme ve altyazı için yerel öncelikli iş akışı." else "A local-first workflow for scripts, scene plans, voiceover and subtitles.", color = Muted, fontSize = 13.sp)
-                        }
-                    }
-                }
-                item { Heading(if (tr) "İÇERİK TÜRÜ" else "CONTENT TYPE", if (tr) "Videonun formatını seç" else "Choose your video format") }
-                items(categories.chunked(2)) { pair ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        pair.forEach { item -> CategoryTile(item, categoryId == item.id, tr, Modifier.weight(1f)) { categoryId = item.id } }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
-                    }
-                }
-                item {
-                    Heading(if (tr) "VİDEO FİKRİ" else "VIDEO IDEA", if (tr) "Konunu veya promptunu yaz" else "Describe your topic or prompt")
-                    OutlinedTextField(
-                        value = prompt, onValueChange = { prompt = it }, modifier = Modifier.fillMaxWidth(),
-                        minLines = 3, shape = RoundedCornerShape(13.dp),
-                        placeholder = { Text(if (tr) "Örn. Mars'ta terk edilmiş bir robot..." else "e.g. A robot abandoned on Mars discovers...") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple, unfocusedBorderColor = Color(0xFF393642), focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
-                }
-                item {
-                    Heading(if (tr) "VİDEO AYARLARI" else "VIDEO SETTINGS", if (tr) "Üretim tercihleri" else "Generation preferences")
-                    Text(if (tr) "Süre" else "Duration", color = Muted, fontSize = 12.sp)
-                    ChoiceRow(listOf("30s","45s","60s","90s","3m"), duration) { duration = it }
-                    Spacer(Modifier.height(8.dp))
-                    Text(if (tr) "En-boy oranı" else "Aspect ratio", color = Muted, fontSize = 12.sp)
-                    ChoiceRow(listOf("9:16","16:9","1:1"), ratio) { ratio = it }
-                    Spacer(Modifier.height(8.dp))
-                    Text(if (tr) "Görsel stil" else "Visual style", color = Muted, fontSize = 12.sp)
-                    ChoiceRow(listOf("Cinematic","2D Art","Motion Graphics","Comic"), style) { style = it }
-                }
-                item {
-                    Heading(if (tr) "SES VE ALTYAZI" else "VOICE & SUBTITLES", if (tr) "Video dili sabit: English" else "Video language is fixed: English")
-                    Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(13.dp)) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            EngineRow(Icons.Rounded.MusicNote, "Kokoro TTS", if (tr) "İngilizce seslendirme" else "English voiceover")
-                            HorizontalDivider(color = Color(0xFF34313B))
-                            EngineRow(Icons.Rounded.ClosedCaption, "Whisper", if (tr) "İngilizce altyazı ve zamanlama" else "English subtitles and timestamps")
-                        }
-                    }
-                    Text(if (tr) "Arayüz dili değişebilir; video anlatımı, diyaloglar ve altyazılar daima İngilizcedir." else "The interface language can change; video narration, dialogue and subtitles always remain in English.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp))
-                }
-                item {
-                    Button(
-                        onClick = {
-                            drafts.add(Draft(prompt.trim(), category.en, duration, ratio))
-                            created = true
-                        },
-                        enabled = prompt.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth().height(53.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Purple)
-                    ) {
-                        Icon(Icons.Rounded.AutoAwesome, null)
-                        Text(if (tr) "  Proje taslağı oluştur" else "  Create project brief", fontWeight = FontWeight.Bold)
-                    }
-                    Text(if (tr) "Bu ilk temel sürüm proje ayarlarını kaydeder. Yerel LLM, Kokoro, Whisper ve render motorları sonraki aşamalarda bağlanacaktır." else "This foundation build saves project settings. Local LLM, Kokoro, Whisper and rendering engines will be integrated in later milestones.", color = Muted, fontSize = 11.sp)
-                }
-                if (created && drafts.isNotEmpty()) {
-                    item {
-                        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1B2923)), shape = RoundedCornerShape(12.dp)) {
-                            Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.Check, null, tint = Color(0xFF78D6A2))
-                                Column(Modifier.padding(start = 9.dp)) {
-                                    Text(if (tr) "Proje taslağı oluşturuldu" else "Project brief created", color = Color(0xFF9BE7B9), fontWeight = FontWeight.Bold)
-                                    Text(drafts.last().title, color = Color.White, fontSize = 12.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-                item {
-                    Heading(if (tr) "SON PROJELER" else "RECENT PROJECTS", if (tr) "Bu oturumdaki taslaklar" else "Briefs from this session")
-                    if (drafts.isEmpty()) Text(if (tr) "Henüz proje yok." else "No projects yet.", color = Muted, fontSize = 13.sp)
-                    else drafts.reversed().forEach { draft ->
-                        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(11.dp), modifier = Modifier.padding(bottom = 7.dp)) {
-                            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.Movie, null, tint = Purple)
-                                Column(Modifier.padding(start = 10.dp)) {
-                                    Text(draft.title, color = Color.White, maxLines = 1, fontWeight = FontWeight.Medium)
-                                    Text("${draft.category} • ${draft.duration} • ${draft.ratio}", color = Muted, fontSize = 11.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+ fun saveProject(p:VideoProject){store.save(p);val i=projects.indexOfFirst{it.id==p.id};if(i>=0)projects[i]=p else projects.add(0,p)}
+ fun updateActive(transform:(VideoProject)->VideoProject){val p=active?:return;saveProject(transform(p))}
+ fun createProject(){
+  val seconds=when(duration){"30s"->30;"45s"->45;"60s"->60;"90s"->90;"3m"->180;else->45}
+  val p=VideoProject(title=idea.trim().take(52).ifBlank{"Untitled video"},idea=idea.trim(),category=category,durationSeconds=seconds,aspectRatio=ratio,visualStyle=style,
+   scenes=listOf(VideoScene(title="Opening scene",durationSeconds=6,visualDescription="Establish the location, mood and main subject.",layers=listOf(SceneLayer(name="Environment",kind="background"),SceneLayer(name="Main subject",kind="foreground")))))
+  saveProject(p);activeProjectId=p.id;sceneIndex=0;page="editor"
+ }
+ fun updateScene(scene:VideoScene){updateActive{p->p.copy(scenes=p.scenes.mapIndexed{i,s->if(i==sceneIndex)scene else s})}}
+ fun addScene(){updateActive{p->p.copy(scenes=p.scenes+VideoScene(title="Scene ${p.scenes.size+1}",visualDescription="Describe the action and composition."))};sceneIndex=(active?.scenes?.size?:0)}
+ fun goEditor(p:VideoProject){activeProjectId=p.id;sceneIndex=0;page="editor"}
+
+ MaterialTheme(colorScheme=darkColorScheme(primary=Purple,background=Bg,surface=Panel,onSurface=Color.White)){
+  Scaffold(containerColor=Bg, bottomBar={
+   if(page!="editor") NavigationBar(containerColor=Panel){
+    NavigationBarItem(selected=page=="home",onClick={page="home"},icon={Icon(Icons.Rounded.AutoAwesome,null)},label={Text(if(tr)"Oluştur" else "Create")})
+    NavigationBarItem(selected=page=="projects",onClick={page="projects"},icon={Icon(Icons.Rounded.Movie,null)},label={Text(if(tr)"Projeler" else "Projects")})
+    NavigationBarItem(selected=page=="settings",onClick={page="settings"},icon={Icon(Icons.Rounded.Settings,null)},label={Text(if(tr)"Ayarlar" else "Settings")})
+   }
+  }){padding->
+   Column(Modifier.fillMaxSize().padding(padding)){
+    if(page!="editor") TopBar(tr,language){language=if(language=="tr")"en" else "tr"}
+    when(page){
+     "home"->LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(15.dp)){
+      item{Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF21182E)),shape=RoundedCornerShape(16.dp)){Column(Modifier.padding(17.dp)){Text(if(tr)"VEX VIDEO AI" else "VEX VIDEO AI",color=Purple,fontWeight=FontWeight.Bold,letterSpacing=2.sp);Text(if(tr)"Fikrini videoya dönüştür" else "Turn an idea into a video",fontSize=23.sp,fontWeight=FontWeight.Bold);Text(if(tr)"Yerel yapay zekâ ile senaryo, storyboard, ses ve video." else "Script, storyboard, voice and video with local AI.",color=Muted,fontSize=12.sp)}}}
+      item{Section(if(tr)"İÇERİK TÜRÜ" else "CONTENT TYPE",if(tr)"Bir format seç" else "Choose a format")}
+      items(categories.chunked(2)){pair->Row(horizontalArrangement=Arrangement.spacedBy(9.dp)){pair.forEach{c->CategoryCard(c,category==c.id,tr,Modifier.weight(1f)){category=c.id}};if(pair.size==1)Spacer(Modifier.weight(1f))}}
+      item{Section(if(tr)"VİDEO FİKRİ" else "VIDEO IDEA",if(tr)"Konu veya prompt" else "Topic or prompt");OutlinedTextField(idea,{idea=it},Modifier.fillMaxWidth(),minLines=3,placeholder={Text(if(tr)"Örn. Terk edilmiş bir kasabadan gelen sinyal..." else "e.g. A signal coming from an abandoned town...")},colors=fieldColors())}
+      item{Section(if(tr)"AYARLAR" else "SETTINGS",if(tr)"Süre, oran ve stil" else "Duration, ratio and style");Text(if(tr)"Süre" else "Duration",color=Muted,fontSize=12.sp);ChoiceRow(listOf("30s","45s","60s","90s","3m"),duration){duration=it};Text(if(tr)"Oran" else "Aspect ratio",color=Muted,fontSize=12.sp);ChoiceRow(listOf("9:16","16:9","1:1"),ratio){ratio=it};Text(if(tr)"Görsel stil" else "Visual style",color=Muted,fontSize=12.sp);ChoiceRow(listOf("Cinematic","2D Art","Motion Graphics","Comic"),style){style=it}}
+      item{Button(onClick={createProject()},enabled=idea.isNotBlank(),Modifier.fillMaxWidth().height(52.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Icon(Icons.Rounded.AutoAwesome,null);Text(if(tr)"  Proje oluştur ve düzenle" else "  Create project and edit")}}
+      item{Text(if(tr)"Videolar daima İngilizce seslendirme ve İngilizce altyazı kullanır." else "Generated videos always use English voiceover and English subtitles.",color=Muted,fontSize=11.sp)}
+     }
+     "projects"->LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+      item{Section(if(tr)"PROJE KÜTÜPHANESİ" else "PROJECT LIBRARY",if(tr)"Cihazda kayıtlı projelerin" else "Projects saved on this device")}
+      if(projects.isEmpty())item{Text(if(tr)"Henüz proje yok." else "No projects yet.",color=Muted)}
+      items(projects,key={it.id}){p->Card(Modifier.fillMaxWidth().clickable{goEditor(p)},colors=CardDefaults.cardColors(containerColor=Panel)){Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Rounded.Movie,null,tint=Purple);Column(Modifier.weight(1f).padding(start=10.dp)){Text(p.title,color=Color.White,fontWeight=FontWeight.SemiBold);Text("${p.category} • ${p.scenes.size} scenes • ${p.aspectRatio}",color=Muted,fontSize=11.sp)};IconButton(onClick={store.delete(p.id);projects.removeAll{it.id==p.id}}){Icon(Icons.Rounded.Delete,null,tint=Muted)}}}}
+     }
+     "settings"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+      Section(if(tr)"YEREL LLM" else "LOCAL LLM",if(tr)"OpenAI uyumlu yerel sunucu" else "OpenAI-compatible local server")
+      Text(if(tr)"Örnek: llama.cpp server, LM Studio veya Ollama OpenAI uyumlu endpoint." else "Example: llama.cpp server, LM Studio or an OpenAI-compatible Ollama endpoint.",color=Muted,fontSize=12.sp)
+      OutlinedTextField(endpoint,{endpoint=it},Modifier.fillMaxWidth(),label={Text("Chat completions URL")},colors=fieldColors())
+      OutlinedTextField(model,{model=it},Modifier.fillMaxWidth(),label={Text(if(tr)"Model adı" else "Model name")},colors=fieldColors())
+      OutlinedTextField(apiKey,{apiKey=it},Modifier.fillMaxWidth(),label={Text(if(tr)"API key (opsiyonel)" else "API key (optional)")},colors=fieldColors())
+      Button(onClick={prefs.edit().putString("llm_endpoint",endpoint).putString("llm_model",model).apply();notice=if(tr)"Ayarlar kaydedildi." else "Settings saved."},Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(tr)"Kaydet" else "Save settings")}
+      if(notice.isNotBlank())Text(notice,color=Color(0xFF9BE7B9))
+      Divider(color=Color(0xFF34313B))
+      Section(if(tr)"ÜRETİM MOTORLARI" else "GENERATION ENGINES",if(tr)"Kurulum durumları" else "Runtime status")
+      EngineCatalog.initial.forEach{e->Card(colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(13.dp)){Text(e.displayName,color=Color.White,fontWeight=FontWeight.SemiBold);Text(e.purpose,color=Muted,fontSize=12.sp);Text(e.detail,color=Color(0xFFE6B66D),fontSize=11.sp);Text(if(tr)"Henüz bağlı değil" else "Not connected yet",color=Muted,fontSize=10.sp)}}}
+     }
+     "editor"->{
+      if(active==null){page="projects"}else{
+       Row(Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){Text("‹",Modifier.clickable{page="projects"}.padding(8.dp),color=Purple,fontSize=27.sp);Column(Modifier.weight(1f)){Text(active.title,color=Color.White,fontWeight=FontWeight.Bold);Text(if(tr)"STORYBOARD • CANVAS • TIMELINE" else "STORYBOARD • CANVAS • TIMELINE",color=Muted,fontSize=9.sp,letterSpacing=1.sp)};TextButton(onClick={saveProject(active);notice=if(tr)"Kaydedildi" else "Saved"}){Text(if(tr)"Kaydet" else "Save")}}
+       if(selectedScene==null){Column(Modifier.padding(18.dp)){Text(if(tr)"Sahne bulunamadı" else "No scenes yet",color=Muted);Button(onClick={addScene}){Text("Add scene")}}}
+       else LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(horizontal=14.dp,vertical=5.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+        item{Section(if(tr)"SAHNE ÖNİZLEMESİ" else "SCENE CANVAS",selectedScene.title);SceneCanvas(active.aspectRatio,selectedScene)}
+        item{Section(if(tr)"SAHNE ZAMAN ÇİZELGESİ" else "SCENE TIMELINE",if(tr)"Sahne seç ve sırala" else "Select a scene");Row(Modifier.fillMaxWidth().height(68.dp).verticalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(7.dp),verticalAlignment=Alignment.CenterVertically){active.scenes.forEachIndexed{i,s->Surface(color=if(i==sceneIndex)Color(0xFF392447) else Panel,border=BorderStroke(1.dp,if(i==sceneIndex)Purple else Color(0xFF34313B)),shape=RoundedCornerShape(8.dp),modifier=Modifier.width(94.dp).fillMaxHeight().clickable{sceneIndex=i}){Column(Modifier.padding(8.dp),verticalArrangement=Arrangement.SpaceBetween){Text("SCENE ${i+1}",color=Purple,fontSize=9.sp,fontWeight=FontWeight.Bold);Text(s.title,color=Color.White,fontSize=11.sp,maxLines=1);Text("${s.durationSeconds}s",color=Muted,fontSize=10.sp)}}};Surface(color=Panel,shape=RoundedCornerShape(8.dp),modifier=Modifier.fillMaxHeight().width(48.dp).clickable{addScene()}){Box(contentAlignment=Alignment.Center){Icon(Icons.Rounded.Add,null,tint=Purple)}}}}
+        item{Section(if(tr)"SAHNE DETAYLARI" else "SCENE DETAILS",if(tr)"İçeriği düzenle" else "Edit scene content")}
+        item{OutlinedTextField(selectedScene.title,{updateScene(selectedScene.copy(title=it))},Modifier.fillMaxWidth(),label={Text(if(tr)"Sahne adı" else "Scene title")},singleLine=true,colors=fieldColors())}
+        item{Text(if(tr)"Süre: ${selectedScene.durationSeconds} saniye" else "Duration: ${selectedScene.durationSeconds} seconds",color=Muted,fontSize=12.sp);Slider(selectedScene.durationSeconds.toFloat(),{updateScene(selectedScene.copy(durationSeconds=it.toInt().coerceIn(1,120)))},valueRange=1f..30f)}
+        item{OutlinedTextField(selectedScene.narration,{updateScene(selectedScene.copy(narration=it))},Modifier.fillMaxWidth(),minLines=3,label={Text("English narration")},colors=fieldColors())}
+        item{OutlinedTextField(selectedScene.dialogue,{updateScene(selectedScene.copy(dialogue=it))},Modifier.fillMaxWidth(),minLines=2,label={Text("English dialogue")},colors=fieldColors())}
+        item{OutlinedTextField(selectedScene.visualDescription,{updateScene(selectedScene.copy(visualDescription=it))},Modifier.fillMaxWidth(),minLines=3,label={Text(if(tr)"Görsel açıklama" else "Visual direction")},colors=fieldColors())}
+        item{Text("Camera: ${selectedScene.cameraMovement} • Transition: ${selectedScene.transition}",color=Muted,fontSize=11.sp)}
+        item{Section(if(tr)"KATMANLAR" else "CANVAS LAYERS",if(tr)"Arka plan ve ön plan öğeleri" else "Background and foreground elements");selectedScene.layers.forEach{layer->Row(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){Text(if(layer.kind=="background")"BG" else "FG",color=Purple,fontSize=10.sp,fontWeight=FontWeight.Bold);Text(layer.name,Modifier.weight(1f).padding(start=9.dp),color=Color.White,fontSize=12.sp);TextButton(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers.filterNot{it.id==layer.id}))}){Text(if(tr)"Sil" else "Remove",color=Muted)}}};Button(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers+SceneLayer(name="New visual element",kind="foreground")))},colors=ButtonDefaults.buttonColors(containerColor=Panel)){Icon(Icons.Rounded.Add,null);Text(if(tr)" Katman ekle" else " Add layer")}}
+        item{Button(onClick={scope.launch{busy=true;notice="";try{val fresh=LocalLlmClient().createStoryboard(active,LlmSettings(endpoint,model,apiKey));saveProject(active.copy(scenes=fresh));sceneIndex=0;notice=if(tr)"AI storyboard hazır." else "AI storyboard generated."}catch(e:Exception){notice=e.message?: "Generation failed"}finally{busy=false}}},enabled=!busy,Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp) else Icon(Icons.Rounded.AutoAwesome,null);Text(if(tr)"  Yerel LLM ile storyboard üret" else "  Generate storyboard with local LLM")}}
+        if(notice.isNotBlank())item{Text(notice,color=if(notice.contains("generated")||notice.contains("hazır"))Color(0xFF9BE7B9) else Color(0xFFE6B66D),fontSize=12.sp)}
+        item{Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF21182E))){Column(Modifier.padding(12.dp)){Text(if(tr)"Sonraki motorlar" else "Next production engines",color=Purple,fontWeight=FontWeight.Bold);Text("Kokoro TTS • Whisper subtitles • MP4 export",color=Color.White,fontSize=12.sp);Text(if(tr)"Henüz gerçek runtime bağlı değil; sahte tamamlandı durumu gösterilmez." else "Native runtimes are not connected yet; no fake completion status is shown.",color=Muted,fontSize=10.sp)}}}
+       }
+      }
+     }
     }
+   }
+  }
+ }
 }
 
-@Composable private fun LangButton(label: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(color = if (selected) Purple else Panel, shape = RoundedCornerShape(8.dp), modifier = Modifier.clickable { onClick() }) {
-        Text(label, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp))
-    }
-}
-@Composable private fun Heading(title: String, subtitle: String) {
-    Column(Modifier.padding(bottom = 3.dp)) {
-        Text(title, color = Purple, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-        Text(subtitle, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-@Composable private fun CategoryTile(item: Category, selected: Boolean, tr: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    Surface(
-        color = if (selected) Color(0xFF30203F) else Panel,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(if (selected) 1.5.dp else 1.dp, if (selected) Purple else Color(0xFF302D37)),
-        modifier = modifier.clickable { onClick() }
-    ) {
-        Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(item.icon, color = Purple, fontSize = 18.sp)
-                Spacer(Modifier.weight(1f))
-                if (selected) Icon(Icons.Rounded.Check, null, tint = Purple, modifier = Modifier.size(16.dp))
-            }
-            Text(if (tr) item.tr else item.en, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            Text(if (tr) item.subTr else item.subEn, color = Muted, fontSize = 10.sp, lineHeight = 13.sp, minLines = 2)
-        }
-    }
-}
-@Composable private fun ChoiceRow(options: List<String>, selected: String, onSelect: (String) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
-        options.forEach { option ->
-            FilterChip(
-                selected = selected == option, onClick = { onSelect(option) },
-                label = { Text(option, fontSize = 10.sp) }, modifier = Modifier.weight(1f),
-                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF392447), selectedLabelColor = Color.White, labelColor = Muted)
-            )
-        }
-    }
-}
-@Composable private fun EngineRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = Purple, modifier = Modifier.size(22.dp))
-        Column(Modifier.weight(1f).padding(start = 10.dp)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            Text(subtitle, color = Muted, fontSize = 11.sp)
-        }
-        Surface(color = Color(0xFF33243F), shape = RoundedCornerShape(6.dp)) {
-            Text("EN", color = Purple, fontWeight = FontWeight.Bold, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
-        }
-    }
+@Composable private fun TopBar(tr:Boolean,language:String,onLanguage:()->Unit){Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("VEX VIDEO AI",color=Purple,fontSize=11.sp,fontWeight=FontWeight.Bold,letterSpacing=2.sp);Text(if(tr)"AI içerik stüdyosu" else "AI Content Studio",color=Color.White,fontSize=22.sp,fontWeight=FontWeight.Bold)};TextButton(onClick=onLanguage){Text(language.uppercase(),color=Purple,fontWeight=FontWeight.Bold)}}}
+@Composable private fun Section(title:String,subtitle:String){Column(Modifier.padding(bottom=2.dp)){Text(title,color=Purple,fontSize=10.sp,fontWeight=FontWeight.Bold,letterSpacing=1.3.sp);Text(subtitle,color=Color.White,fontSize=16.sp,fontWeight=FontWeight.SemiBold)}}
+@Composable private fun CategoryCard(c:Category,selected:Boolean,tr:Boolean,modifier:Modifier,onClick:()->Unit){Surface(modifier.clickable{onClick()},color=if(selected)Color(0xFF30203F) else Panel,border=BorderStroke(1.dp,if(selected)Purple else Color(0xFF302D37)),shape=RoundedCornerShape(11.dp)){Column(Modifier.padding(11.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){Row(verticalAlignment=Alignment.CenterVertically){Text(c.icon,color=Purple,fontSize=18.sp);Spacer(Modifier.weight(1f));if(selected)Icon(Icons.Rounded.Check,null,tint=Purple,modifier=Modifier.size(15.dp))};Text(if(tr)c.tr else c.en,color=Color.White,fontSize=13.sp,fontWeight=FontWeight.SemiBold);Text(if(tr)c.subTr else c.subEn,color=Muted,fontSize=10.sp,minLines=1)}}}
+@Composable private fun ChoiceRow(options:List<String>,selected:String,onSelect:(String)->Unit){Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){options.forEach{FilterChip(selected==it,{onSelect(it)},{Text(it,fontSize=10.sp)},modifier=Modifier.weight(1f),colors=FilterChipDefaults.filterChipColors(selectedContainerColor=Color(0xFF392447),selectedLabelColor=Color.White,labelColor=Muted))}}}
+@Composable private fun fieldColors()=OutlinedTextFieldDefaults.colors(focusedBorderColor=Purple,unfocusedBorderColor=Color(0xFF393642),focusedTextColor=Color.White,unfocusedTextColor=Color.White)
+@Composable private fun SceneCanvas(ratio:String,scene:VideoScene){
+ val aspect=when(ratio){"16:9"->16f/9f;"1:1"->1f;else->9f/16f}
+ BoxWithConstraints(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center){
+  val w=maxWidth.coerceAtMost(340.dp);val h=if(aspect>1f)w/aspect else w/aspect
+  Canvas(Modifier.width(w).height(h.coerceAtMost(430.dp))) {
+   drawRect(Color(0xFF171522))
+   drawRect(Color(0xFF29213B),topLeft=Offset(0f,size.height*.58f),size=androidx.compose.ui.geometry.Size(size.width,size.height*.42f))
+   drawCircle(Color(0xFF51406B),radius=size.minDimension*.14f,center=Offset(size.width*.76f,size.height*.22f))
+   drawRect(Color(0xFF09090D),topLeft=Offset(size.width*.12f,size.height*.48f),size=androidx.compose.ui.geometry.Size(size.width*.18f,size.height*.34f))
+   drawRect(Color(0xFF09090D),topLeft=Offset(size.width*.68f,size.height*.40f),size=androidx.compose.ui.geometry.Size(size.width*.16f,size.height*.42f))
+   drawLine(Purple,Offset(0f,size.height*.85f),Offset(size.width,size.height*.85f),2.dp.toPx())
+  }
+  Column(Modifier.width(w).height(h.coerceAtMost(430.dp)).padding(12.dp),verticalArrangement=Arrangement.SpaceBetween){
+   Text("PREVIEW • ${scene.durationSeconds}s",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold)
+   Column { Text(scene.title,color=Color.White,fontSize=15.sp,fontWeight=FontWeight.Bold);Text(scene.visualDescription.ifBlank{"Add a visual description to guide this scene."},color=Color(0xFFD5CADD),fontSize=10.sp,maxLines=3) }
+  }
+ }
 }
