@@ -55,6 +55,7 @@ import com.vex.videoai.media.AndroidEnglishSpeechEngine
 import com.vex.videoai.media.WhisperLocalEngine
 import com.vex.videoai.media.SrtExporter
 import com.vex.videoai.media.Media3VideoExporter
+import com.vex.videoai.media.VideoOutputDimensions
 import com.vex.videoai.models.ModelCatalog
 import com.vex.videoai.models.ModelDownloadManager
 import com.vex.videoai.production.ProductionProfile
@@ -197,7 +198,7 @@ class MainActivity:ComponentActivity(){
      ){progress->pipelineProgress=progress;if(progress.stage==ProductionStage.RENDER)renderProgress=progress.completed}
      saveProject(produced);sceneIndex=0
     }else{
-     Media3VideoExporter(context).export(projectToRender,temp,resolutionLongEdge=exportResolution.removeSuffix("p").toInt(),frameRate=exportFps.toInt()){renderProgress=it}
+     Media3VideoExporter(context).export(projectToRender,temp,resolutionLongEdge=VideoOutputDimensions.longEdgeForLabel(exportResolution),frameRate=exportFps.toInt()){renderProgress=it}
     }
     val output=context.contentResolver.openOutputStream(uri)?:error("Could not write to the selected destination.")
     output.use{stream->temp.inputStream().use{input->input.copyTo(stream)}}

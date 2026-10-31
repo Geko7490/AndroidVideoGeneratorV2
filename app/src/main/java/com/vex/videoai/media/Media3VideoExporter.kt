@@ -42,7 +42,7 @@ class Media3VideoExporter(context:Context) {
         outputFile.parentFile?.mkdirs()
         val workDir=File(app.cacheDir,"vex-render-${project.id}").apply { deleteRecursively();mkdirs() }
         return try {
-            val frames=withContext(Dispatchers.IO) { renderFrames(project,workDir,resolutionLongEdge.coerceIn(480,2160)) }
+            val frames=withContext(Dispatchers.IO) { renderFrames(project,workDir,resolutionLongEdge.coerceIn(480,3840)) }
             withContext(Dispatchers.Main.immediate) { onProgress(25) }
             val items=frames.map { frame ->
                 val mediaItem=MediaItem.Builder().setUri(frame.file.toUri()).setImageDurationMs(frame.durationMs).build()
