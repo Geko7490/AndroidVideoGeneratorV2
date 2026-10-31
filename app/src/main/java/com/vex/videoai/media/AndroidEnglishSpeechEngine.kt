@@ -23,6 +23,7 @@ class AndroidEnglishSpeechEngine(private val context:Context) {
         require(text.isNotBlank()) { "Enter English narration before generating voiceover." }
         require(text.all { it.code<128 }) { "Voiceover text must be English." }
         output.parentFile?.mkdirs()
+        if(output.exists())output.delete()
         suspendCancellableCoroutine { continuation ->
             var tts:TextToSpeech?=null
             var initialized=false

@@ -155,6 +155,7 @@ class Media3VideoExporter(context:Context) {
             }
             val asset=if(layer.assetPath.isNotBlank())BitmapFactory.decodeFile(layer.assetPath) else null
             if(asset!=null) {
+                paint.color=AndroidColor.WHITE
                 val targetWidth=(width*.58f*layer.scale.coerceIn(.1f,2f)).coerceAtMost(width*.9f)
                 val targetHeight=targetWidth*asset.height.toFloat()/asset.width.coerceAtLeast(1)
                 canvas.drawBitmap(asset,null,RectF(x-targetWidth/2,y-targetHeight/2,x+targetWidth/2,y+targetHeight/2),paint)
