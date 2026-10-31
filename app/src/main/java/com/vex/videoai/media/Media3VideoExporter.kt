@@ -35,7 +35,7 @@ class Media3VideoExporter(context:Context) {
         require(project.scenes.isNotEmpty()) { "Add at least one scene before exporting." }
         outputFile.parentFile?.mkdirs()
         val workDir=File(app.cacheDir,"vex-render-${project.id}").apply { deleteRecursively();mkdirs() }
-        try {
+        return try {
             val frames=withContext(Dispatchers.IO) { renderFrames(project,workDir) }
             withContext(Dispatchers.Main.immediate) { onProgress(25) }
             val items=frames.map { frame ->
