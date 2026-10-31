@@ -31,16 +31,16 @@ private data class RenderFrame(val file:File,val durationMs:Long)
 class Media3VideoExporter(context:Context) {
     private val app=context.applicationContext
 
-    suspend fun export(project:VideoProject,outputFile:File,onProgress:(Int)->Unit={}):File {
+    suspend fun export(project:VideoProject,outputFile:File,resolutionLongEdge:Int=1080,frameRate:Int=30,onProgress:(Int)->Unit={}):File {
         require(project.scenes.isNotEmpty()) { "Add at least one scene before exporting." }
         outputFile.parentFile?.mkdirs()
         val workDir=File(app.cacheDir,"vex-render-${project.id}").apply { deleteRecursively();mkdirs() }
         return try {
-            val frames=withContext(Dispatchers.IO) { renderFrames(project,workDir) }
+            val frames=withContext(Dispatchers.IO) { renderFrames(project,workDir,resolutionLongEdge.coerceIn(480,2160)) }
             withContext(Dispatchers.Main.immediate) { onProgress(25) }
             val items=frames.map { frame ->
                 val mediaItem=MediaItem.Builder().setUri(frame.file.toUri()).setImageDurationMs(frame.durationMs).build()
-                EditedMediaItem.Builder(mediaItem).setFrameRate(30).build()
+                EditedMediaItem.Builder(mediaItem).setFrameRate(frameRate.coerceIn(24,60)).build()
             }
             val sequence=EditedMediaItemSequence.withVideoFrom(items)
             val audioFiles=project.scenes.map { File(it.voiceoverPath) }
@@ -86,11 +86,11 @@ class Media3VideoExporter(context:Context) {
         }
     }
 
-    private fun renderFrames(project:VideoProject,dir:File):List<RenderFrame> {
+    private fun renderFrames(project:VideoProject,dir:File,longEdge:Int):List<RenderFrame> {
         val (width,height)=when(project.aspectRatio) {
-            "16:9" -> 1920 to 1080
-            "1:1" -> 1080 to 1080
-            else -> 1080 to 1920
+            "16:9" -> longEdge to (longEdge*9/16)
+            "1:1" -> longEdge to longEdge
+            else -> (longEdge*9/16) to longEdge
         }
         val result=mutableListOf<RenderFrame>()
         var index=0
