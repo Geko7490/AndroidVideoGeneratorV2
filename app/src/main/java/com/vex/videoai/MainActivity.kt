@@ -1,6 +1,7 @@
 package com.vex.videoai
 
 import android.os.Bundle
+import android.app.DownloadManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
@@ -41,7 +42,10 @@ import com.vex.videoai.data.SceneLayer
 import com.vex.videoai.data.VideoProject
 import com.vex.videoai.data.VideoScene
 import com.vex.videoai.media.EngineCatalog
+import com.vex.videoai.models.ModelCatalog
+import com.vex.videoai.models.ModelDownloadManager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 private val Bg=Color(0xFF101014)
 private val Panel=Color(0xFF1B1A22)
@@ -105,6 +109,7 @@ class MainActivity:ComponentActivity(){
    if(page!="editor") NavigationBar(containerColor=Panel){
     NavigationBarItem(selected=page=="home",onClick={page="home"},icon={Icon(Icons.Rounded.AutoAwesome,null)},label={Text(if(tr)"Oluştur" else "Create")})
     NavigationBarItem(selected=page=="projects",onClick={page="projects"},icon={Icon(Icons.Rounded.Movie,null)},label={Text(if(tr)"Projeler" else "Projects")})
+    NavigationBarItem(selected=page=="models",onClick={page="models"},icon={Icon(Icons.Rounded.Download,null)},label={Text(if(tr)"Modeller" else "Models")})
     NavigationBarItem(selected=page=="settings",onClick={page="settings"},icon={Icon(Icons.Rounded.Settings,null)},label={Text(if(tr)"Ayarlar" else "Settings")})
    }
   }){padding->
@@ -125,7 +130,7 @@ class MainActivity:ComponentActivity(){
       if(projects.isEmpty())item{Text(if(tr)"Henüz proje yok." else "No projects yet.",color=Muted)}
       items(projects,key={it.id}){p->Card(Modifier.fillMaxWidth().clickable{goEditor(p)},colors=CardDefaults.cardColors(containerColor=Panel)){Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Rounded.Movie,null,tint=Purple);Column(Modifier.weight(1f).padding(start=10.dp)){Text(p.title,color=Color.White,fontWeight=FontWeight.SemiBold);Text("${p.category} • ${p.scenes.size} scenes • ${p.aspectRatio}",color=Muted,fontSize=11.sp)};IconButton(onClick={store.delete(p.id);projects.removeAll{it.id==p.id}}){Icon(Icons.Rounded.Delete,null,tint=Muted)}}}}
      }
-     "settings"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+     "models"->ModelCenterScreen(tr)\n     "settings"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
       Section(if(tr)"YEREL LLM" else "LOCAL LLM",if(tr)"OpenAI uyumlu yerel sunucu" else "OpenAI-compatible local server")
       Text(if(tr)"Örnek: llama.cpp server, LM Studio veya Ollama OpenAI uyumlu endpoint." else "Example: llama.cpp server, LM Studio or an OpenAI-compatible Ollama endpoint.",color=Muted,fontSize=12.sp)
       OutlinedTextField(endpoint,{endpoint=it},Modifier.fillMaxWidth(),label={Text("Chat completions URL")},colors=fieldColors())
@@ -185,5 +190,37 @@ class MainActivity:ComponentActivity(){
    Text("PREVIEW • ${scene.durationSeconds}s",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold)
    Column { Text(scene.title,color=Color.White,fontSize=15.sp,fontWeight=FontWeight.Bold);Text(scene.visualDescription.ifBlank{"Add a visual description to guide this scene."},color=Color(0xFFD5CADD),fontSize=10.sp,maxLines=3) }
   }
+ }
+}
+
+@Composable private fun ModelCenterScreen(tr:Boolean){
+ val context=LocalContext.current
+ val manager= remember { ModelDownloadManager(context) }
+ var refresh by remember { mutableIntStateOf(0) }
+ LaunchedEffect(Unit){while(true){delay(1000);refresh++}}
+ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+  Section(if(tr)"MODEL CENTER" else "MODEL CENTER",if(tr)"Yerel ses ve altyazı modelleri" else "Local voice and subtitle models")
+  Text(if(tr)"Modeller isteğe bağlı indirilir. İndirme tamamlanması, çıkarım motorunun da hazır olduğu anlamına gelmez." else "Models download on demand. A completed download does not mean the inference runtime is installed.",color=Muted,fontSize=12.sp)
+  ModelCatalog.assets.forEach{asset->
+   val progress=remember(refresh){manager.progress(asset)}
+   val done=progress?.status==DownloadManager.STATUS_SUCCESSFUL
+   val running=progress?.status==DownloadManager.STATUS_RUNNING||progress?.status==DownloadManager.STATUS_PENDING
+   Card(colors=CardDefaults.cardColors(containerColor=Panel),shape=RoundedCornerShape(13.dp)){
+    Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
+     Text(asset.group,color=Purple,fontSize=10.sp,fontWeight=FontWeight.Bold)
+     Text(asset.name,color=Color.White,fontWeight=FontWeight.SemiBold)
+     Text(asset.description,color=Muted,fontSize=11.sp)
+     Text(asset.sizeLabel,color=Muted,fontSize=10.sp)
+     if(running){LinearProgressIndicator(progress={if(progress.total>0)progress.percent/100f else 0f},Modifier.fillMaxWidth(),color=Purple);Text("${progress.percent}% • ${progress.downloaded/1024/1024} MB",color=Muted,fontSize=10.sp)}
+     if(progress?.status==DownloadManager.STATUS_FAILED)Text(if(tr)"İndirme başarısız. Tekrar deneyebilirsin." else "Download failed. You can retry.",color=Color(0xFFE6B66D),fontSize=11.sp)
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
+      if(running)OutlinedButton(onClick={manager.cancel(asset);refresh++}){Text(if(tr)"İptal" else "Cancel")}
+      else if(done)Text(if(tr)"İndirildi • Runtime bağlantısı bekleniyor" else "Downloaded • Runtime integration pending",color=Color(0xFF9BE7B9),fontSize=10.sp,modifier=Modifier.padding(8.dp))
+      else Button(onClick={manager.enqueue(asset);refresh++},colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(tr)"İndir" else "Download")}
+     }
+    }
+   }
+  }
+  Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF21182E))){Column(Modifier.padding(13.dp)){Text(if(tr)"Model güvenliği" else "Model handling",color=Purple,fontWeight=FontWeight.Bold);Text(if(tr)"İndirmeler Android Download Manager üzerinden yapılır ve uygulamanın özel dosya alanına kaydedilir. Modeller otomatik çalıştırılmaz." else "Downloads use Android Download Manager and are saved in the app-specific storage. Models are never executed automatically.",color=Muted,fontSize=11.sp)}}
  }
 }
