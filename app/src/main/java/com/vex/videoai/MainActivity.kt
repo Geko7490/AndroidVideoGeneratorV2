@@ -51,12 +51,15 @@ import com.vex.videoai.data.SubtitleLine
 import com.vex.videoai.data.VideoProject
 import com.vex.videoai.data.VideoScene
 import com.vex.videoai.media.EngineCatalog
+import com.vex.videoai.media.AndroidEnglishSpeechEngine
 import com.vex.videoai.media.WhisperLocalEngine
 import com.vex.videoai.media.SrtExporter
 import com.vex.videoai.media.Media3VideoExporter
 import com.vex.videoai.models.ModelCatalog
 import com.vex.videoai.models.ModelDownloadManager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import java.io.File
 
@@ -103,6 +106,8 @@ class MainActivity:ComponentActivity(){
  var renderProgress by remember { mutableIntStateOf(0) }
  var exportResolution by rememberSaveable { mutableStateOf("1080p") }
  var exportFps by rememberSaveable { mutableStateOf("30") }
+ var pendingImageLayerId by rememberSaveable { mutableStateOf("") }
+ var pendingImageSceneId by rememberSaveable { mutableStateOf("") }
  var notice by remember { mutableStateOf("") }
  val scope= rememberCoroutineScope()
  val tr=language=="tr"
@@ -146,6 +151,20 @@ class MainActivity:ComponentActivity(){
     val cues=active?.scenes?.getOrNull(sceneIndex)?.subtitles.orEmpty()
     context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(SrtExporter.toSrt(cues))}?:error("Could not create the SRT file.")
    }.onSuccess{notice=if(tr)"SRT dosyası kaydedildi." else "SRT file saved."}.onFailure{notice=it.message?:"SRT export failed."}
+  }
+ }
+  val imagePicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+  if(uri!=null)scope.launch{
+   try{
+    val project=active?:error("Open a project first.")
+    val layerId=pendingImageLayerId;val sceneId=pendingImageSceneId
+    val extension=MimeTypeMap.getSingleton().getExtensionFromMimeType(context.contentResolver.getType(uri))?:"png"
+    val assetDir=File(context.filesDir,"vex-video-projects/"+project.id+"/assets").apply{mkdirs()}
+    val imageFile=File(assetDir,layerId+"."+extension)
+    withContext(Dispatchers.IO){val input=context.contentResolver.openInputStream(uri)?:error("Could not open the selected image.");input.use{stream->imageFile.outputStream().use{out->stream.copyTo(out)}}}
+    updateActive{p->p.copy(scenes=p.scenes.map{scene->if(scene.id==sceneId)scene.copy(layers=scene.layers.map{layer->if(layer.id==layerId)layer.copy(assetPath=imageFile.absolutePath)else layer})else scene})}
+    notice=if(tr)"Görsel katmana eklendi." else "Image attached to the canvas layer."
+   }catch(e:Exception){notice=e.message?: "Image import failed."}
   }
  }
  val videoPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")){uri->
@@ -215,12 +234,27 @@ class MainActivity:ComponentActivity(){
         item{OutlinedButton(onClick={updateActive{p->p.copy(scenes=p.scenes.filterNot{it.id==selectedScene.id})};sceneIndex=(sceneIndex-1).coerceAtLeast(0)},enabled=active.scenes.size>1,modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.outlinedButtonColors(contentColor=Color(0xFFE58C8C))){Icon(Icons.Rounded.Delete,null);Text(if(tr)" Bu sahneyi sil" else " Delete this scene")}}
         item{Text(if(tr)"Süre: ${selectedScene.durationSeconds} saniye" else "Duration: ${selectedScene.durationSeconds} seconds",color=Muted,fontSize=12.sp);Slider(selectedScene.durationSeconds.toFloat(),{updateScene(selectedScene.copy(durationSeconds=it.toInt().coerceIn(1,120)))},valueRange=1f..120f)}
         item{OutlinedTextField(selectedScene.narration,{updateScene(selectedScene.copy(narration=it))},Modifier.fillMaxWidth(),minLines=3,label={Text("English narration")},colors=fieldColors())}
+        item{Button(onClick={scope.launch{
+         val project=active;val scene=selectedScene
+         if(project==null||scene==null){notice=if(tr)"Önce bir sahne seç." else "Select a scene first."}
+         else{busy=true;notice="";try{
+          val voiceText=scene.narration.ifBlank{scene.dialogue}
+          require(voiceText.isNotBlank()){"Add English narration or dialogue first."}
+          val audioDir=File(context.filesDir,"vex-video-projects/"+project.id).apply{mkdirs()}
+          val audio=File(audioDir,scene.id+"-voice.wav")
+          AndroidEnglishSpeechEngine(context).synthesize(voiceText,audio)
+          val whisperAsset=ModelCatalog.assets.first{it.id=="whisper_tiny_en"}
+          val cues=if(modelManager.isDownloaded(whisperAsset))WhisperLocalEngine(context).transcribeEnglish(audio,modelManager.fileFor(whisperAsset)) else scene.subtitles
+          updateActive{p->p.copy(scenes=p.scenes.mapIndexed{i,current->if(i==sceneIndex)current.copy(voiceoverPath=audio.absolutePath,subtitles=cues)else current})}
+          notice=if(cues.isNotEmpty())if(tr)"Ses üretildi ve "+cues.size+" altyazı satırı eklendi." else "Voiceover generated and "+cues.size+" subtitle cues added." else if(tr)"Ses üretildi. Otomatik altyazı için Model Center’dan Whisper tiny.en indir." else "Voiceover generated. Download Whisper tiny.en in Model Center to add automatic subtitles."
+         }catch(e:Exception){notice=e.message?: "Voice generation failed."}finally{busy=false}}
+        }},modifier=Modifier.fillMaxWidth(),enabled=!busy&&((selectedScene.narration.isNotBlank())||(selectedScene.dialogue.isNotBlank())),colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)else Icon(Icons.Rounded.MusicNote,null);Text(if(tr)"  İngilizce ses üret (çevrimdışı TTS)" else "  Generate English voiceover (offline TTS)")}}
         item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Section(if(tr)"WHISPER ALTYAZILARI" else "WHISPER SUBTITLES",if(tr)"Bu sahnenin ses dosyasını seç" else "Choose this scene's voiceover audio")};Button(onClick={audioPicker.launch(arrayOf("audio/wav","audio/x-wav","audio/mpeg","audio/flac"))},enabled=!busy,colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp)else Icon(Icons.Rounded.ClosedCaption,null);Text(if(tr)" Seslendiriyi çöz" else " Transcribe audio")}}}
         item{if(selectedScene.subtitles.isEmpty())Text(if(tr)"Henüz altyazı yok. Whisper ile ses dosyasından oluşturabilir veya elle ekleyebilirsin." else "No subtitle cues yet. Transcribe an audio file with Whisper or add one manually.",color=Muted,fontSize=11.sp) else selectedScene.subtitles.forEach{cue->Column(Modifier.fillMaxWidth().padding(vertical=5.dp)){Text("${cue.startMs/1000.0}s – ${cue.endMs/1000.0}s",color=Purple,fontSize=10.sp);OutlinedTextField(cue.text,{text->updateScene(selectedScene.copy(subtitles=selectedScene.subtitles.map{if(it.id==cue.id)it.copy(text=text)else it}))},Modifier.fillMaxWidth(),minLines=1,colors=fieldColors());TextButton(onClick={updateScene(selectedScene.copy(subtitles=selectedScene.subtitles.filterNot{it.id==cue.id}))}){Text(if(tr)"Satırı sil" else "Remove cue",color=Muted)}}};Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){Button(onClick={updateScene(selectedScene.copy(subtitles=selectedScene.subtitles+SubtitleLine(startMs=0,endMs=selectedScene.durationSeconds*1000L,text="New English subtitle")))},colors=ButtonDefaults.buttonColors(containerColor=Panel)){Icon(Icons.Rounded.Add,null);Text(if(tr)" Elle altyazı ekle" else " Add cue")};if(selectedScene.subtitles.isNotEmpty())OutlinedButton(onClick={srtPicker.launch("scene-${sceneIndex+1}.srt")}){Text("Export SRT")}}}
         item{OutlinedTextField(selectedScene.dialogue,{updateScene(selectedScene.copy(dialogue=it))},Modifier.fillMaxWidth(),minLines=2,label={Text("English dialogue")},colors=fieldColors())}
         item{OutlinedTextField(selectedScene.visualDescription,{updateScene(selectedScene.copy(visualDescription=it))},Modifier.fillMaxWidth(),minLines=3,label={Text(if(tr)"Görsel açıklama" else "Visual direction")},colors=fieldColors())}
         item{Text(if(tr)"Kamera hareketi" else "Camera movement",color=Muted,fontSize=11.sp);ChoiceRow(listOf("Static","Pan","Zoom in","Zoom out","Dolly"),selectedScene.cameraMovement){v->updateScene(selectedScene.copy(cameraMovement=v))};Text(if(tr)"Sahne geçişi" else "Scene transition",color=Muted,fontSize=11.sp);ChoiceRow(listOf("Cut","Fade","Dissolve","Wipe"),selectedScene.transition){v->updateScene(selectedScene.copy(transition=v))}}
-        item{Section(if(tr)"KATMANLAR" else "CANVAS LAYERS",if(tr)"Arka plan ve ön plan öğeleri" else "Background and foreground elements");selectedScene.layers.forEach{layer->Column(Modifier.fillMaxWidth().padding(vertical=5.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(if(layer.kind=="background")"BG" else "FG",color=Purple,fontSize=10.sp,fontWeight=FontWeight.Bold);Text(layer.name,Modifier.weight(1f).padding(start=9.dp),color=Color.White,fontSize=12.sp);TextButton(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers.filterNot{it.id==layer.id}))}){Text(if(tr)"Sil" else "Remove",color=Muted)}};Text(if(tr)"Yatay konum" else "Horizontal position",color=Muted,fontSize=9.sp);Slider(value=layer.x.coerceIn(0f,1f),onValueChange={x->updateScene(selectedScene.copy(layers=selectedScene.layers.map{if(it.id==layer.id)it.copy(x=x)else it}))},valueRange=0f..1f);Text(if(tr)"Dikey konum" else "Vertical position",color=Muted,fontSize=9.sp);Slider(value=layer.y.coerceIn(0f,1f),onValueChange={y->updateScene(selectedScene.copy(layers=selectedScene.layers.map{if(it.id==layer.id)it.copy(y=y)else it}))},valueRange=0f..1f)}};Button(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers+SceneLayer(name="New visual element",kind="foreground")))},colors=ButtonDefaults.buttonColors(containerColor=Panel)){Icon(Icons.Rounded.Add,null);Text(if(tr)" Katman ekle" else " Add layer")}}
+        item{Section(if(tr)"KATMANLAR" else "CANVAS LAYERS",if(tr)"Arka plan ve ön plan öğeleri" else "Background and foreground elements");selectedScene.layers.forEach{layer->Column(Modifier.fillMaxWidth().padding(vertical=5.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(if(layer.kind=="background")"BG" else "FG",color=Purple,fontSize=10.sp,fontWeight=FontWeight.Bold);Text(layer.name,Modifier.weight(1f).padding(start=9.dp),color=Color.White,fontSize=12.sp);OutlinedButton(onClick={pendingImageLayerId=layer.id;pendingImageSceneId=selectedScene.id;imagePicker.launch(arrayOf("image/png","image/jpeg","image/webp"))}){Text(if(layer.assetPath.isBlank())"Image" else "Replace",fontSize=9.sp)};TextButton(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers.filterNot{it.id==layer.id}))}){Text(if(tr)"Sil" else "Remove",color=Muted)}};Text(if(tr)"Yatay konum" else "Horizontal position",color=Muted,fontSize=9.sp);Slider(value=layer.x.coerceIn(0f,1f),onValueChange={x->updateScene(selectedScene.copy(layers=selectedScene.layers.map{if(it.id==layer.id)it.copy(x=x)else it}))},valueRange=0f..1f);Text(if(tr)"Dikey konum" else "Vertical position",color=Muted,fontSize=9.sp);Slider(value=layer.y.coerceIn(0f,1f),onValueChange={y->updateScene(selectedScene.copy(layers=selectedScene.layers.map{if(it.id==layer.id)it.copy(y=y)else it}))},valueRange=0f..1f)}};Button(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers+SceneLayer(name="New visual element",kind="foreground")))},colors=ButtonDefaults.buttonColors(containerColor=Panel)){Icon(Icons.Rounded.Add,null);Text(if(tr)" Katman ekle" else " Add layer")}}
         item{Button(onClick={scope.launch{busy=true;notice="";try{val starter=ModelCatalog.assets.first { it.id=="qwen3_06b" };val gguf=modelManager.fileFor(starter);val fresh=if(gguf.exists())OnDeviceLlmClient(context).createStoryboard(active,gguf,threads=4) else LocalLlmClient().createStoryboard(active,LlmSettings(endpoint,model,apiKey));saveProject(active.copy(scenes=fresh));sceneIndex=0;notice=if(tr)"AI storyboard hazır." else "AI storyboard generated."}catch(e:Exception){notice=e.message?: "Generation failed"}finally{busy=false}}},modifier=Modifier.fillMaxWidth(),enabled=!busy,colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp) else Icon(Icons.Rounded.AutoAwesome,null);Text(if(tr)"  Yerel LLM ile storyboard üret" else "  Generate storyboard with local LLM")}}
         item{Section(if(tr)"DIŞA AKTARMA AYARLARI" else "EXPORT SETTINGS",if(tr)"Çözünürlük ve kare hızı" else "Resolution and frame rate");Text(if(tr)"Uzun kenar çözünürlüğü" else "Long-edge resolution",color=Muted,fontSize=10.sp);ChoiceRow(listOf("480p","720p","1080p","1440p","2160p"),exportResolution){exportResolution=it};Text(if(tr)"Kare hızı" else "Frame rate",color=Muted,fontSize=10.sp);ChoiceRow(listOf("24","30","60"),exportFps){exportFps=it};if(exportResolution=="2160p")Text(if(tr)"4K dışa aktarma yüksek RAM ve depolama kullanır." else "4K export uses substantial memory and storage.",color=Color(0xFFE6B66D),fontSize=10.sp)}
 item{Button(onClick={videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_-]"),"_").take(40).ifBlank{"vex-video"}+".mp4")},modifier=Modifier.fillMaxWidth(),enabled=!busy&&active.scenes.isNotEmpty(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF34303D))){Icon(Icons.Rounded.Movie,null);Text(if(tr)"  MP4 dışa aktar" else "  Export MP4")};if(busy&&renderProgress>0)Text("Render: ${renderProgress}%",color=Muted,fontSize=11.sp)}
