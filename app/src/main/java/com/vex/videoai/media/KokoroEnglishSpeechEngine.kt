@@ -13,8 +13,13 @@ class KokoroEnglishSpeechEngine(private val context:Context,private val modelFil
 
     suspend fun initialize() {
         require(modelFile.isFile&&modelFile.length()>1024L) { "Download the Kokoro INT8 ONNX model in Model Center first." }
-        KokoroTTS.initialize(context.applicationContext,modelFile.absolutePath)
-        initialized=true
+        try {
+            KokoroTTS.initialize(context.applicationContext,modelFile.absolutePath)
+            initialized=true
+        } catch(error:Exception) {
+            KokoroTTS.release()
+            throw error
+        }
     }
 
     suspend fun synthesize(text:String,output:File,speed:Float=1f):File {

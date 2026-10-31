@@ -34,7 +34,7 @@ class SequentialVideoProduction(private val context:Context) {
             catch(error:Exception) { candidate.release();kokoroFallbackReason=error.message?: "Kokoro initialization failed" }
         }
         val androidSpeech=AndroidEnglishSpeechEngine(context)
-        val speechName=if(kokoro!=null)"Kokoro neural TTS" else "Android system TTS fallback"
+        val speechName=if(kokoro!=null) "Kokoro neural TTS" else if(kokoroFallbackReason.isNotBlank()) "Android TTS fallback • Kokoro unavailable: "+kokoroFallbackReason.take(90) else "Android system TTS fallback"
         val audioDir=File(context.filesDir,"vex-video-projects/"+source.id).apply{mkdirs()}
         try {
             val voiced=mutableListOf<VideoScene>()
