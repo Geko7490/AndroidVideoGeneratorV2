@@ -3,10 +3,12 @@ import android.content.Context
 import com.vex.videoai.ai.LlmSettings
 import com.vex.videoai.ai.LocalLlmClient
 import com.vex.videoai.ai.OnDeviceLlmClient
+import com.vex.videoai.data.SubtitleLine
 import com.vex.videoai.data.VideoProject
 import com.vex.videoai.data.VideoScene
 import com.vex.videoai.media.AndroidEnglishSpeechEngine
 import com.vex.videoai.media.Media3VideoExporter
+import com.vex.videoai.media.SilentWavWriter
 import com.vex.videoai.media.WhisperLocalEngine
 import java.io.File
 
@@ -26,6 +28,7 @@ class SequentialVideoProduction(private val context:Context) {
         val speech=AndroidEnglishSpeechEngine(context)
         val audioDir=File(context.filesDir,"vex-video-projects/"+source.id).apply{mkdirs()}
         val voiced=mutableListOf<VideoScene>()
+        val spokenSceneIndexes=mutableListOf<Int>()
         scenes.forEachIndexed{index,scene->
             val spokenLines=buildList{
                 if(scene.narration.isNotBlank())add(scene.narration)
@@ -34,16 +37,23 @@ class SequentialVideoProduction(private val context:Context) {
                     if(spoken.isNotBlank())add(spoken)
                 }
             }
-            require(spokenLines.isNotEmpty()) { "Scene ${index+1} has no narration or dialogue to voice." }
             val audio=File(audioDir,scene.id+"-voice.wav")
-            speech.synthesize(spokenLines.joinToString("\n"),audio)
+            if(spokenLines.isEmpty()) {
+                SilentWavWriter.write(audio,scene.durationSeconds)
+            } else {
+                speech.synthesize(spokenLines.joinToString("\n"),audio)
+                spokenSceneIndexes.add(index)
+            }
             voiced.add(scene.copy(voiceoverPath=audio.absolutePath))
-            onProgress(ProductionProgress(ProductionStage.VOICEOVER,index+1,scenes.size,"Voiceover ${index+1}/${scenes.size}"))
+            onProgress(ProductionProgress(ProductionStage.VOICEOVER,index+1,scenes.size,if(spokenLines.isEmpty())"Silent scene ${index+1}/${scenes.size}" else "Voiceover ${index+1}/${scenes.size}"))
         }
-        val subtitleBatches=WhisperLocalEngine(context).transcribeEnglishBatch(voiced.map{File(it.voiceoverPath)},whisperModel){completed,total->
-            onProgress(ProductionProgress(ProductionStage.SUBTITLES,completed,total,"Subtitle pass ${completed}/${total}"))
+        require(spokenSceneIndexes.isNotEmpty()) { "The storyboard contains no narration or dialogue. Regenerate it with spoken English content." }
+        val subtitlesByScene=MutableList(scenes.size){emptyList<SubtitleLine>()}
+        val subtitleBatches=WhisperLocalEngine(context).transcribeEnglishBatch(spokenSceneIndexes.map{File(voiced[it].voiceoverPath)},whisperModel){completed,total->
+            onProgress(ProductionProgress(ProductionStage.SUBTITLES,completed,total,"Whisper pass ${completed}/${total}"))
         }
-        val completedProject=source.copy(scenes=voiced.mapIndexed{index,scene->scene.copy(subtitles=subtitleBatches[index])})
+        spokenSceneIndexes.forEachIndexed{batchIndex,sceneIndex->subtitlesByScene[sceneIndex]=subtitleBatches[batchIndex]}
+        val completedProject=source.copy(scenes=voiced.mapIndexed{index,scene->scene.copy(subtitles=subtitlesByScene[index])})
         onProgress(ProductionProgress(ProductionStage.RENDER,0,1,"Rendering ${profile.defaultResolution} at ${profile.defaultFps} fps"))
         Media3VideoExporter(context).export(completedProject,outputFile,resolutionLongEdge=profile.defaultResolution.removeSuffix("p").toInt(),frameRate=profile.defaultFps.toInt()){percent->onProgress(ProductionProgress(ProductionStage.RENDER,percent,100,"MP4 render $percent%"))}
         onProgress(ProductionProgress(ProductionStage.COMPLETE,4,4,"Video exported"))

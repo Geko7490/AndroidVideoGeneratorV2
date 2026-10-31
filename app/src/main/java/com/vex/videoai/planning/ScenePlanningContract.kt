@@ -20,11 +20,13 @@ data class ScenePlanningRequest(
     val visualStyle: String
 )
 
+data class PlannedDialogue(val speaker:String,val text:String)
+
 data class PlannedScene(
     val id: Int,
     val durationSeconds: Int,
     val narration: String,
-    val dialogue: List<String>,
+    val dialogue: List<PlannedDialogue>,
     val visualDescription: String,
     val backgroundLayers: List<String>,
     val foregroundLayers: List<String>,
