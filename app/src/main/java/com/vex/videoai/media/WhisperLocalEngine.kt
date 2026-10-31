@@ -6,7 +6,6 @@ import dev.ffmpegkit.whisper.Whisper
 import dev.ffmpegkit.whisper.WhisperConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withContext
 import java.io.File
 
 class WhisperLocalEngine(private val context:Context) {

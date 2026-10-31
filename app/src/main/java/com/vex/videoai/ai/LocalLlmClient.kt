@@ -41,7 +41,7 @@ class LocalLlmClient {
     VideoScene(title=s.optString("title","Scene "+(i+1)),durationSeconds=s.optInt("durationSeconds",6).coerceIn(1,120),narration=s.optString("narration"),dialogue=dialogue,visualDescription=s.optString("visualDescription"),cameraMovement=s.optString("cameraMovement","Static"),transition=s.optString("transition","Cut"),layers=layers)
    } }
    require(result.isNotEmpty()) { "The model returned no usable scenes." }
-   require(result.all { it.narration.all { ch->ch.code<128 }&&it.dialogue.all { ch->ch.code<128 } }) { "The model generated non-English narration or dialogue. Retry; video language must be English." }
+   require(result.all { scene->listOf(scene.narration,scene.dialogue,scene.visualDescription,scene.title,scene.cameraMovement,scene.transition).all { value->value.all { ch->ch.code<128 } }&&scene.layers.all { layer->layer.name.all { ch->ch.code<128 } } }) { "The model generated non-English narration or dialogue. Retry; video language must be English." }
    SceneDurationNormalizer.normalize(result,project.durationSeconds)
   } finally { c.disconnect() }
  }
