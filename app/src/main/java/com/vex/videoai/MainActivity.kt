@@ -109,7 +109,7 @@ class MainActivity:ComponentActivity(){
    if(page!="editor") NavigationBar(containerColor=Panel){
     NavigationBarItem(selected=page=="home",onClick={page="home"},icon={Icon(Icons.Rounded.AutoAwesome,null)},label={Text(if(tr)"Oluştur" else "Create")})
     NavigationBarItem(selected=page=="projects",onClick={page="projects"},icon={Icon(Icons.Rounded.Movie,null)},label={Text(if(tr)"Projeler" else "Projects")})
-    NavigationBarItem(selected=page=="models",onClick={page="models"},icon={Icon(Icons.Rounded.Download,null)},label={Text(if(tr)"Modeller" else "Models")})
+    NavigationBarItem(selected=page=="models",onClick={page="models"},icon={Icon(Icons.Rounded.Add,null)},label={Text(if(tr)"Modeller" else "Models")})
     NavigationBarItem(selected=page=="settings",onClick={page="settings"},icon={Icon(Icons.Rounded.Settings,null)},label={Text(if(tr)"Ayarlar" else "Settings")})
    }
   }){padding->
