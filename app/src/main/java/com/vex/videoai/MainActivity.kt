@@ -57,6 +57,10 @@ import com.vex.videoai.media.SrtExporter
 import com.vex.videoai.media.Media3VideoExporter
 import com.vex.videoai.models.ModelCatalog
 import com.vex.videoai.models.ModelDownloadManager
+import com.vex.videoai.production.ProductionProfile
+import com.vex.videoai.production.ProductionProgress
+import com.vex.videoai.production.ProductionStage
+import com.vex.videoai.production.SequentialVideoProduction
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -106,6 +110,9 @@ class MainActivity:ComponentActivity(){
  var renderProgress by remember { mutableIntStateOf(0) }
  var exportResolution by rememberSaveable { mutableStateOf("1080p") }
  var exportFps by rememberSaveable { mutableStateOf("30") }
+ var profile by rememberSaveable { mutableStateOf(ProductionProfile.fromId(prefs.getString("production_profile","mid")?:"mid")) }
+ var productionPending by remember { mutableStateOf(false) }
+ var pipelineProgress by remember { mutableStateOf<ProductionProgress?>(null) }
  var pendingImageLayerId by rememberSaveable { mutableStateOf("") }
  var pendingImageSceneId by rememberSaveable { mutableStateOf("") }
  var pendingImageProjectId by rememberSaveable { mutableStateOf("") }
@@ -172,16 +179,28 @@ class MainActivity:ComponentActivity(){
  val videoPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")){uri->
   val projectToRender=active
   if(uri!=null&&projectToRender!=null)scope.launch{
-   busy=true;renderProgress=0;notice=""
-   val temp=File(context.cacheDir,"vex-render-${projectToRender.id}.mp4")
+   busy=true;renderProgress=0;notice="";pipelineProgress=null
+   val fullRun=productionPending
+   val temp=File(context.cacheDir,"vex-render-"+projectToRender.id+".mp4")
    try{
-    Media3VideoExporter(context).export(projectToRender,temp,resolutionLongEdge=exportResolution.removeSuffix("p").toInt(),frameRate=exportFps.toInt()){renderProgress=it}
+    if(fullRun){
+     val localAsset=ModelCatalog.assets.first{it.id=="qwen3_06b"}
+     val whisperAsset=ModelCatalog.assets.first{it.id=="whisper_tiny_en"}
+     val produced=SequentialVideoProduction(context).run(
+      projectToRender,LlmSettings(endpoint,model,apiKey,profile.maxTokens),
+      if(modelManager.isDownloaded(localAsset))modelManager.fileFor(localAsset) else null,
+      modelManager.fileFor(whisperAsset),profile,temp
+     ){progress->pipelineProgress=progress;if(progress.stage==ProductionStage.RENDER)renderProgress=progress.completed}
+     saveProject(produced);sceneIndex=0
+    }else{
+     Media3VideoExporter(context).export(projectToRender,temp,resolutionLongEdge=exportResolution.removeSuffix("p").toInt(),frameRate=exportFps.toInt()){renderProgress=it}
+    }
     val output=context.contentResolver.openOutputStream(uri)?:error("Could not write to the selected destination.")
     output.use{stream->temp.inputStream().use{input->input.copyTo(stream)}}
-    val withAudio=projectToRender.scenes.all{it.voiceoverPath.isNotBlank()&&File(it.voiceoverPath).exists()};notice=if(withAudio)if(tr)"MP4 hazır: seslendirme ve altyazılar eklendi." else "MP4 exported with per-scene voiceovers and burned-in subtitles." else if(tr)"MP4 hazır ancak tüm sahnelere ses dosyası eklenmediği için sessiz dışa aktarıldı." else "MP4 exported silently. Attach a voiceover to every scene to include audio."
-   }catch(e:Exception){notice=e.message?:"MP4 export failed."}
-   finally{temp.delete();busy=false}
-  }
+    notice=if(fullRun)if(tr)"Video baştan sona üretildi: senaryo, ses, Whisper altyazı ve MP4." else "Full production completed: script, voiceovers, Whisper subtitles and MP4." else if(tr)"MP4 dışa aktarıldı." else "MP4 exported."
+   }catch(e:Exception){notice=(pipelineProgress?.stage?.label?.plus(" • ")?: "")+(e.message?: "Video production failed.")}
+   finally{temp.delete();busy=false;productionPending=false}
+  }else productionPending=false
  }
  MaterialTheme(colorScheme=darkColorScheme(primary=Purple,background=Bg,surface=Panel,onSurface=Color.White)){
   Scaffold(containerColor=Bg, bottomBar={
@@ -211,6 +230,11 @@ class MainActivity:ComponentActivity(){
      }
      "models"->ModelCenterScreen(tr)
      "settings"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+      Section(if(tr)"PERFORMANS PROFİLİ" else "PERFORMANCE PROFILE",if(tr)"Cihazın ne kadarını kullansın?" else "How much device power to use")
+      ChoiceRow(listOf("Low","Mid","High"),profile.label){value->profile=ProductionProfile.fromId(value.lowercase());prefs.edit().putString("production_profile",profile.id).apply()}
+      Text(when(profile){ProductionProfile.LOW->if(tr)"Düşük yük • 2 CPU iş parçacığı • 2048 bağlam • 720p / 24 FPS" else "Lower load • 2 CPU threads • 2048 context • 720p / 24 FPS";ProductionProfile.MID->if(tr)"Dengeli • 4 CPU iş parçacığı • 4096 bağlam • 1080p / 30 FPS" else "Balanced • 4 CPU threads • 4096 context • 1080p / 30 FPS";ProductionProfile.HIGH->if(tr)"Yüksek yük • en fazla 8 CPU iş parçacığı • 6144 bağlam • 1080p / 60 FPS" else "High load • up to 8 CPU threads • 6144 context • 1080p / 60 FPS"},color=Muted,fontSize=11.sp)
+      Text(if(tr)"High daha fazla işlemci ve bellek kullanır; cihaz ısınabilir ve pil daha hızlı tükenebilir." else "High uses more CPU and memory; the device may heat up and drain battery faster.",color=Color(0xFFE6B66D),fontSize=10.sp)
+      Divider(color=Color(0xFF34313B))
       Section(if(tr)"YEREL LLM" else "LOCAL LLM",if(tr)"OpenAI uyumlu yerel sunucu" else "OpenAI-compatible local server")
       Text(if(tr)"Qwen3 GGUF modelini Model Center’dan indirirsen uygulama doğrudan cihazda çalıştırır. İstersen aşağıdaki OpenAI uyumlu yerel sunucu da kullanılabilir." else "Download a Qwen3 GGUF model in Model Center to run it directly on-device. You can also use the OpenAI-compatible local server below.",color=Muted,fontSize=12.sp)
       OutlinedTextField(endpoint,{endpoint=it},Modifier.fillMaxWidth(),label={Text("Chat completions URL")},colors=fieldColors())
@@ -258,6 +282,13 @@ class MainActivity:ComponentActivity(){
         item{Text(if(tr)"Kamera hareketi" else "Camera movement",color=Muted,fontSize=11.sp);ChoiceRow(listOf("Static","Pan","Zoom in","Zoom out","Dolly"),selectedScene.cameraMovement){v->updateScene(selectedScene.copy(cameraMovement=v))};Text(if(tr)"Sahne geçişi" else "Scene transition",color=Muted,fontSize=11.sp);ChoiceRow(listOf("Cut","Fade","Dissolve","Wipe"),selectedScene.transition){v->updateScene(selectedScene.copy(transition=v))}}
         item{Section(if(tr)"KATMANLAR" else "CANVAS LAYERS",if(tr)"Arka plan ve ön plan öğeleri" else "Background and foreground elements");selectedScene.layers.forEach{layer->Column(Modifier.fillMaxWidth().padding(vertical=5.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(if(layer.kind=="background")"BG" else "FG",color=Purple,fontSize=10.sp,fontWeight=FontWeight.Bold);OutlinedTextField(layer.name,{name->updateScene(selectedScene.copy(layers=selectedScene.layers.map{if(it.id==layer.id)it.copy(name=name)else it}))},Modifier.weight(1f).padding(start=9.dp),singleLine=true,colors=fieldColors());Checkbox(checked=layer.visible,onCheckedChange={visible->updateScene(selectedScene.copy(layers=selectedScene.layers.map{if(it.id==layer.id)it.copy(visible=visible)else it}))});OutlinedButton(onClick={pendingImageLayerId=layer.id;pendingImageSceneId=selectedScene.id;pendingImageProjectId=active.id;imagePicker.launch(arrayOf("image/png","image/jpeg","image/webp"))}){Text(if(layer.assetPath.isBlank())"Image" else "Replace",fontSize=9.sp)};TextButton(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers.filterNot{it.id==layer.id}))}){Text(if(tr)"Sil" else "Remove",color=Muted)}};Text(if(tr)"Yatay konum" else "Horizontal position",color=Muted,fontSize=9.sp);Slider(value=layer.x.coerceIn(0f,1f),onValueChange={x->updateScene(selectedScene.copy(layers=selectedScene.layers.map{if(it.id==layer.id)it.copy(x=x)else it}))},valueRange=0f..1f);Text(if(tr)"Dikey konum" else "Vertical position",color=Muted,fontSize=9.sp);Slider(value=layer.y.coerceIn(0f,1f),onValueChange={y->updateScene(selectedScene.copy(layers=selectedScene.layers.map{if(it.id==layer.id)it.copy(y=y)else it}))},valueRange=0f..1f);Text(if(tr)"Katman türü" else "Layer type",color=Muted,fontSize=9.sp);ChoiceRow(listOf("background","foreground","text"),layer.kind){kind->updateScene(selectedScene.copy(layers=selectedScene.layers.map{if(it.id==layer.id)it.copy(kind=kind)else it}))};Text(if(tr)"Boyut" else "Scale",color=Muted,fontSize=9.sp);Slider(value=layer.scale.coerceIn(.25f,2.5f),onValueChange={scale->updateScene(selectedScene.copy(layers=selectedScene.layers.map{if(it.id==layer.id)it.copy(scale=scale)else it}))},valueRange=.25f..2.5f)}};Button(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers+SceneLayer(name="New visual element",kind="foreground")))},colors=ButtonDefaults.buttonColors(containerColor=Panel)){Icon(Icons.Rounded.Add,null);Text(if(tr)" Katman ekle" else " Add layer")}}
         item{Button(onClick={scope.launch{busy=true;notice="";try{val starter=ModelCatalog.assets.first { it.id=="qwen3_06b" };val gguf=modelManager.fileFor(starter);val fresh=if(gguf.exists())OnDeviceLlmClient(context).createStoryboard(active,gguf,threads=4) else LocalLlmClient().createStoryboard(active,LlmSettings(endpoint,model,apiKey));saveProject(active.copy(scenes=fresh));sceneIndex=0;notice=if(tr)"AI storyboard hazır." else "AI storyboard generated."}catch(e:Exception){notice=e.message?: "Generation failed"}finally{busy=false}}},modifier=Modifier.fillMaxWidth(),enabled=!busy,colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp) else Icon(Icons.Rounded.AutoAwesome,null);Text(if(tr)"  Yerel LLM ile storyboard üret" else "  Generate storyboard with local LLM")}}
+        item{Button(onClick={
+         val whisper=ModelCatalog.assets.first{it.id=="whisper_tiny_en"}
+         if(!modelManager.isDownloaded(whisper)){notice=if(tr)"Önce Model Center’dan Whisper tiny.en indir." else "Download Whisper tiny.en in Model Center first.";page="models"}
+         else{productionPending=true;videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_-]"),"_").take(40).ifBlank{"vex-video"}+".mp4")}
+        },modifier=Modifier.fillMaxWidth().height(52.dp),enabled=!busy&&active.idea.isNotBlank(),colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)else Icon(Icons.Rounded.AutoAwesome,null);Text(if(tr)"  Tüm videoyu otomatik üret" else "  Generate complete video")}
+        pipelineProgress?.let{progress->Column(Modifier.fillMaxWidth().background(Panel,RoundedCornerShape(10.dp)).padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(progress.stage.label,color=Purple,fontWeight=FontWeight.Bold,fontSize=12.sp);Text(progress.detail,color=Muted,fontSize=11.sp);LinearProgressIndicator(progress={if(progress.total>0)progress.completed.toFloat()/progress.total else 0f},modifier=Modifier.fillMaxWidth(),color=Purple);Text(if(tr)"Sıralı işlem • LLM → Ses → Whisper → MP4" else "Sequential pipeline • LLM → Voice → Whisper → MP4",color=Muted,fontSize=10.sp)}}}
+        item{Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF21182E))){Column(Modifier.padding(12.dp)){Text(if(tr)"ÜRETİM ZİNCİRİ" else "PRODUCTION CHAIN",color=Purple,fontWeight=FontWeight.Bold);Text("LLM → Speech → Whisper → MP4",color=Color.White,fontSize=12.sp);Text(if(tr)"LLM sahneleri, anlatıcı metnini ve karakter diyaloglarını üretir. Şu an çevrimdışı Android TTS ses motoru kullanılır; Kokoro ONNX entegrasyonu sonraki motor adımıdır." else "The LLM creates scenes, narration and character dialogue. Offline Android TTS is the current speech fallback; Kokoro ONNX integration remains a later engine step.",color=Muted,fontSize=10.sp)}}}
         item{Section(if(tr)"DIŞA AKTARMA AYARLARI" else "EXPORT SETTINGS",if(tr)"Çözünürlük ve kare hızı" else "Resolution and frame rate");Text(if(tr)"Uzun kenar çözünürlüğü" else "Long-edge resolution",color=Muted,fontSize=10.sp);ChoiceRow(listOf("480p","720p","1080p","1440p","2160p"),exportResolution){exportResolution=it};Text(if(tr)"Kare hızı" else "Frame rate",color=Muted,fontSize=10.sp);ChoiceRow(listOf("24","30","60"),exportFps){exportFps=it};if(exportResolution=="2160p")Text(if(tr)"4K dışa aktarma yüksek RAM ve depolama kullanır." else "4K export uses substantial memory and storage.",color=Color(0xFFE6B66D),fontSize=10.sp)}
 item{Button(onClick={videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_-]"),"_").take(40).ifBlank{"vex-video"}+".mp4")},modifier=Modifier.fillMaxWidth(),enabled=!busy&&active.scenes.isNotEmpty(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF34303D))){Icon(Icons.Rounded.Movie,null);Text(if(tr)"  MP4 dışa aktar" else "  Export MP4")};if(busy&&renderProgress>0)Text("Render: ${renderProgress}%",color=Muted,fontSize=11.sp)}
         if(notice.isNotBlank())item{Text(notice,color=if(notice.contains("generated")||notice.contains("hazır"))Color(0xFF9BE7B9) else Color(0xFFE6B66D),fontSize=12.sp)}
