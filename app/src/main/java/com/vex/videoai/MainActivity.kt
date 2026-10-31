@@ -212,6 +212,7 @@ class MainActivity:ComponentActivity(){
         item{Section(if(tr)"SAHNE DETAYLARI" else "SCENE DETAILS",if(tr)"İçeriği düzenle" else "Edit scene content")}
         item{OutlinedTextField(selectedScene.title,{updateScene(selectedScene.copy(title=it))},Modifier.fillMaxWidth(),label={Text(if(tr)"Sahne adı" else "Scene title")},singleLine=true,colors=fieldColors())}
         item{OutlinedButton(onClick={updateActive{p->p.copy(scenes=p.scenes.filterNot{it.id==selectedScene.id})};sceneIndex=(sceneIndex-1).coerceAtLeast(0)},enabled=active.scenes.size>1,modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.outlinedButtonColors(contentColor=Color(0xFFE58C8C))){Icon(Icons.Rounded.Delete,null);Text(if(tr)" Bu sahneyi sil" else " Delete this scene")}}
+        item{OutlinedButton(onClick={updateActive{p->p.copy(scenes=p.scenes.filterNot{it.id==selectedScene.id})};sceneIndex=(sceneIndex-1).coerceAtLeast(0)},enabled=active.scenes.size>1,modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.outlinedButtonColors(contentColor=Color(0xFFE58C8C))){Icon(Icons.Rounded.Delete,null);Text(if(tr)" Bu sahneyi sil" else " Delete this scene")}}
         item{Text(if(tr)"Süre: ${selectedScene.durationSeconds} saniye" else "Duration: ${selectedScene.durationSeconds} seconds",color=Muted,fontSize=12.sp);Slider(selectedScene.durationSeconds.toFloat(),{updateScene(selectedScene.copy(durationSeconds=it.toInt().coerceIn(1,120)))},valueRange=1f..120f)}
         item{OutlinedTextField(selectedScene.narration,{updateScene(selectedScene.copy(narration=it))},Modifier.fillMaxWidth(),minLines=3,label={Text("English narration")},colors=fieldColors())}
         item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Section(if(tr)"WHISPER ALTYAZILARI" else "WHISPER SUBTITLES",if(tr)"Bu sahnenin ses dosyasını seç" else "Choose this scene's voiceover audio")};Button(onClick={audioPicker.launch(arrayOf("audio/wav","audio/x-wav","audio/mpeg","audio/flac"))},enabled=!busy,colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp)else Icon(Icons.Rounded.ClosedCaption,null);Text(if(tr)" Seslendiriyi çöz" else " Transcribe audio")}}}
@@ -242,9 +243,10 @@ item{Button(onClick={videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_
 @Composable private fun SceneCanvas(ratio:String,scene:VideoScene){
  val aspect=when(ratio){"16:9"->16f/9f;"1:1"->1f;else->9f/16f}
  BoxWithConstraints(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center){
-  val w=maxWidth.coerceAtMost(340.dp);val h=if(aspect>1f)w/aspect else w/aspect
-  val imageLayers= remember(scene.layers){scene.layers.mapNotNull{layer->if(layer.assetPath.isBlank())null else runCatching{BitmapFactory.decodeFile(layer.assetPath)?.asImageBitmap()?.let{layer.id to it}}.getOrNull()}.filterNotNull().toMap()}
-  Canvas(Modifier.width(w).height(h.coerceAtMost(430.dp))) {
+  val hLimit=430.dp;val w=maxWidth.coerceAtMost(340.dp).coerceAtMost(hLimit*aspect);val h=w/aspect
+  val imageKeys=scene.layers.map{it.id to it.assetPath}
+  val imageLayers= remember(imageKeys){scene.layers.mapNotNull{layer->if(layer.assetPath.isBlank())null else runCatching{BitmapFactory.decodeFile(layer.assetPath)?.asImageBitmap()?.let{layer.id to it}}.getOrNull()}.filterNotNull().toMap()}
+  Canvas(Modifier.width(w).height(h)) {
    drawRect(Color(0xFF171522))
    drawRect(Color(0xFF29213B),topLeft=Offset(0f,size.height*.58f),size=androidx.compose.ui.geometry.Size(size.width,size.height*.42f))
    drawCircle(Color(0xFF51406B),radius=size.minDimension*.14f,center=Offset(size.width*.76f,size.height*.22f))
@@ -260,7 +262,7 @@ item{Button(onClick={videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_
    }
    drawLine(Purple,Offset(0f,size.height*.85f),Offset(size.width,size.height*.85f),2.dp.toPx())
   }
-  Column(Modifier.width(w).height(h.coerceAtMost(430.dp)).padding(12.dp),verticalArrangement=Arrangement.SpaceBetween){
+  Column(Modifier.width(w).height(h).padding(12.dp),verticalArrangement=Arrangement.SpaceBetween){
    Text("PREVIEW • ${scene.durationSeconds}s",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold)
    Column { Text(scene.title,color=Color.White,fontSize=15.sp,fontWeight=FontWeight.Bold);Text(scene.visualDescription.ifBlank{"Add a visual description to guide this scene."},color=Color(0xFFD5CADD),fontSize=10.sp,maxLines=3) }
   }
