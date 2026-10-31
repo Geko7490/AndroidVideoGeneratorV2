@@ -212,7 +212,7 @@ class MainActivity:ComponentActivity(){
      Text(asset.name,color=Color.White,fontWeight=FontWeight.SemiBold)
      Text(asset.description,color=Muted,fontSize=11.sp)
      Text(asset.sizeLabel,color=Muted,fontSize=10.sp)
-     if(running){LinearProgressIndicator(progress={if(progress.total>0)progress.percent/100f else 0f},modifier=Modifier.fillMaxWidth(),color=Purple);Text("${progress.percent}% • ${progress.downloaded/1024/1024} MB",color=Muted,fontSize=10.sp)}
+     if(running && progress!=null){LinearProgressIndicator(progress={if(progress.total>0)progress.percent/100f else 0f},modifier=Modifier.fillMaxWidth(),color=Purple);Text("${progress.percent}% • ${progress.downloaded/1024/1024} MB",color=Muted,fontSize=10.sp)}
      if(progress?.status==DownloadManager.STATUS_FAILED)Text(if(tr)"İndirme başarısız. Tekrar deneyebilirsin." else "Download failed. You can retry.",color=Color(0xFFE6B66D),fontSize=11.sp)
      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
       if(running)OutlinedButton(onClick={manager.cancel(asset);refresh++}){Text(if(tr)"İptal" else "Cancel")}
