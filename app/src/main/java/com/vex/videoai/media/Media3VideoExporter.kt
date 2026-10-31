@@ -87,11 +87,9 @@ class Media3VideoExporter(context:Context) {
     }
 
     private fun renderFrames(project:VideoProject,dir:File,longEdge:Int):List<RenderFrame> {
-        val (width,height)=when(project.aspectRatio) {
-            "16:9" -> longEdge to (longEdge*9/16)
-            "1:1" -> longEdge to longEdge
-            else -> (longEdge*9/16) to longEdge
-        }
+        val dimensions=VideoOutputDimensions.resolve(project.aspectRatio,longEdge)
+        val width=dimensions.width
+        val height=dimensions.height
         val result=mutableListOf<RenderFrame>()
         var index=0
         project.scenes.forEach { scene ->
