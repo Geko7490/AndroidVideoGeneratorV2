@@ -47,8 +47,8 @@ class OnDeviceLlmClient(private val context:Context) {
             val backgrounds=s.optJSONArray("backgroundLayers") ?: JSONArray()
             val foregrounds=s.optJSONArray("foregroundLayers") ?: JSONArray()
             val layers=buildList {
-                for(i in 0 until backgrounds.length()) add(SceneLayer(name=backgrounds.optString(i),kind="background"))
-                for(i in 0 until foregrounds.length()) add(SceneLayer(name=foregrounds.optString(i),kind="foreground"))
+                for(i in 0 until backgrounds.length()) add(SceneLayer(name=backgrounds.optString(i),kind="background",x=.5f,y=.35f,scale=(1f+i*.12f).coerceAtMost(1.8f)))
+                for(i in 0 until foregrounds.length()) add(SceneLayer(name=foregrounds.optString(i),kind="foreground",x=.25f+(i%3)*.25f,y=.58f+(i/3)*.12f,scale=1f))
             }
             VideoScene(
                 title=s.optString("title","Scene ${index+1}"),

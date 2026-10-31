@@ -238,8 +238,14 @@ class MainActivity:ComponentActivity(){
    drawRect(Color(0xFF171522))
    drawRect(Color(0xFF29213B),topLeft=Offset(0f,size.height*.58f),size=androidx.compose.ui.geometry.Size(size.width,size.height*.42f))
    drawCircle(Color(0xFF51406B),radius=size.minDimension*.14f,center=Offset(size.width*.76f,size.height*.22f))
-   drawRect(Color(0xFF09090D),topLeft=Offset(size.width*.12f,size.height*.48f),size=androidx.compose.ui.geometry.Size(size.width*.18f,size.height*.34f))
-   drawRect(Color(0xFF09090D),topLeft=Offset(size.width*.68f,size.height*.40f),size=androidx.compose.ui.geometry.Size(size.width*.16f,size.height*.42f))
+   scene.layers.filter{it.visible}.forEachIndexed{index,layer->
+    val x=layer.x.coerceIn(.05f,.95f)*size.width
+    val y=layer.y.coerceIn(.08f,.88f)*size.height
+    val radius=(size.minDimension*.075f*layer.scale.coerceIn(.25f,2.5f)).coerceAtLeast(8f)
+    val tint=when(layer.kind){"background"->Color(0xFF383047);"text"->Color.White;else->Color(0xFF09090D)}
+    if(layer.kind=="background")drawRoundRect(tint,topLeft=Offset(x-radius*2,y-radius),size=androidx.compose.ui.geometry.Size(radius*4,radius*3),cornerRadius=androidx.compose.ui.geometry.CornerRadius(7.dp.toPx()))
+    else drawCircle(tint,radius=radius,center=Offset(x,y))
+   }
    drawLine(Purple,Offset(0f,size.height*.85f),Offset(size.width,size.height*.85f),2.dp.toPx())
   }
   Column(Modifier.width(w).height(h.coerceAtMost(430.dp)).padding(12.dp),verticalArrangement=Arrangement.SpaceBetween){
