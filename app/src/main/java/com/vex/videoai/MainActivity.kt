@@ -3,6 +3,7 @@ package com.vex.videoai
 import android.os.Bundle
 import android.app.DownloadManager
 import android.webkit.MimeTypeMap
+import android.graphics.BitmapFactory
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -34,6 +35,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -239,6 +243,7 @@ item{Button(onClick={videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_
  val aspect=when(ratio){"16:9"->16f/9f;"1:1"->1f;else->9f/16f}
  BoxWithConstraints(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center){
   val w=maxWidth.coerceAtMost(340.dp);val h=if(aspect>1f)w/aspect else w/aspect
+  val imageLayers= remember(scene.layers){scene.layers.mapNotNull{layer->if(layer.assetPath.isBlank())null else runCatching{BitmapFactory.decodeFile(layer.assetPath)?.asImageBitmap()?.let{layer.id to it}}.getOrNull()}.filterNotNull().toMap()}
   Canvas(Modifier.width(w).height(h.coerceAtMost(430.dp))) {
    drawRect(Color(0xFF171522))
    drawRect(Color(0xFF29213B),topLeft=Offset(0f,size.height*.58f),size=androidx.compose.ui.geometry.Size(size.width,size.height*.42f))
@@ -248,7 +253,9 @@ item{Button(onClick={videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_
     val y=layer.y.coerceIn(.08f,.88f)*size.height
     val radius=(size.minDimension*.075f*layer.scale.coerceIn(.25f,2.5f)).coerceAtLeast(8f)
     val tint=when(layer.kind){"background"->Color(0xFF383047);"text"->Color.White;else->Color(0xFF09090D)}
-    if(layer.kind=="background")drawRoundRect(tint,topLeft=Offset(x-radius*2,y-radius),size=androidx.compose.ui.geometry.Size(radius*4,radius*3),cornerRadius=androidx.compose.ui.geometry.CornerRadius(7.dp.toPx()))
+    val image=imageLayers[layer.id]
+    if(image!=null){val targetWidth=(size.width*.58f*layer.scale.coerceIn(.1f,2f)).toInt().coerceAtLeast(1);val targetHeight=(targetWidth*image.height/image.width.coerceAtLeast(1)).coerceAtLeast(1);drawImage(image,dstOffset=IntOffset(x.toInt()-targetWidth/2,y.toInt()-targetHeight/2),dstSize=IntSize(targetWidth,targetHeight))}
+    else if(layer.kind=="background")drawRoundRect(tint,topLeft=Offset(x-radius*2,y-radius),size=androidx.compose.ui.geometry.Size(radius*4,radius*3),cornerRadius=androidx.compose.ui.geometry.CornerRadius(7.dp.toPx()))
     else drawCircle(tint,radius=radius,center=Offset(x,y))
    }
    drawLine(Purple,Offset(0f,size.height*.85f),Offset(size.width,size.height*.85f),2.dp.toPx())

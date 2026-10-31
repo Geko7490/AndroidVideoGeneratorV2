@@ -2,6 +2,7 @@ package com.vex.videoai.media
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Paint
@@ -152,7 +153,13 @@ class Media3VideoExporter(context:Context) {
                 "text" -> AndroidColor.WHITE
                 else -> AndroidColor.rgb(95+(layerIndex*17%100),65+(layerIndex*13%90),135+(layerIndex*11%100))
             }
-            if(layer.kind=="background")canvas.drawRoundRect(RectF(x-radius*2,y-radius,width-radius*.2f,y+radius*3),radius, radius,paint)
+            val asset=if(layer.assetPath.isNotBlank())BitmapFactory.decodeFile(layer.assetPath) else null
+            if(asset!=null) {
+                val targetWidth=(width*.58f*layer.scale.coerceIn(.1f,2f)).coerceAtMost(width*.9f)
+                val targetHeight=targetWidth*asset.height.toFloat()/asset.width.coerceAtLeast(1)
+                canvas.drawBitmap(asset,null,RectF(x-targetWidth/2,y-targetHeight/2,x+targetWidth/2,y+targetHeight/2),paint)
+                asset.recycle()
+            } else if(layer.kind=="background")canvas.drawRoundRect(RectF(x-radius*2,y-radius,width-radius*.2f,y+radius*3),radius, radius,paint)
             else if(layer.kind=="text") {
                 paint.textSize=width*.045f;paint.typeface=android.graphics.Typeface.create("sans-serif-bold",android.graphics.Typeface.BOLD)
                 canvas.drawText(layer.name.take(36),x,y,paint)
