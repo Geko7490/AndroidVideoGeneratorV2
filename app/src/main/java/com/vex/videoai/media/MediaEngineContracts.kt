@@ -9,6 +9,7 @@ enum class RuntimeState { NOT_INSTALLED,READY,RUNNING,FAILED }
 data class EngineDescriptor(val id:String,val displayName:String,val purpose:String,val state:RuntimeState,val detail:String)
 object EngineCatalog { val initial=listOf(
  EngineDescriptor("llama","llama.cpp","On-device GGUF storyboard generation",RuntimeState.NOT_INSTALLED,"Download a GGUF model in Model Center to activate"),
+    EngineDescriptor("android_tts","Android system TTS","Offline English voiceover fallback",RuntimeState.READY,"Uses the installed English voice on this Android device"),
  EngineDescriptor("kokoro","Kokoro TTS","English voice generation",RuntimeState.NOT_INSTALLED,"ONNX model and voice assets required"),
  EngineDescriptor("whisper","Whisper","English transcription and word timing",RuntimeState.NOT_INSTALLED,"Download the tiny.en model in Model Center to activate"),
  EngineDescriptor("renderer","Video Renderer","Layered image-sequence MP4 export",RuntimeState.READY,"Media3 renderer supports scene images, burned subtitles and per-scene voiceover tracks when all scenes have audio")

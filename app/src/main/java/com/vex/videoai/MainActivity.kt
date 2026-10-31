@@ -193,7 +193,7 @@ class MainActivity:ComponentActivity(){
       if(notice.isNotBlank())Text(notice,color=Color(0xFF9BE7B9))
       Divider(color=Color(0xFF34313B))
       Section(if(tr)"ÜRETİM MOTORLARI" else "GENERATION ENGINES",if(tr)"Kurulum durumları" else "Runtime status")
-      EngineCatalog.initial.forEach{e->Card(colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(13.dp)){Text(e.displayName,color=Color.White,fontWeight=FontWeight.SemiBold);Text(e.purpose,color=Muted,fontSize=12.sp);Text(e.detail,color=Color(0xFFE6B66D),fontSize=11.sp);Text(if(tr)"Henüz bağlı değil" else "Not connected yet",color=Muted,fontSize=10.sp)}}}
+      EngineCatalog.initial.forEach{e->Card(colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(13.dp)){Text(e.displayName,color=Color.White,fontWeight=FontWeight.SemiBold);Text(e.purpose,color=Muted,fontSize=12.sp);Text(e.detail,color=Color(0xFFE6B66D),fontSize=11.sp);Text(when(e.state){com.vex.videoai.media.RuntimeState.READY->if(tr)"Hazır" else "Ready";com.vex.videoai.media.RuntimeState.RUNNING->if(tr)"Çalışıyor" else "Running";com.vex.videoai.media.RuntimeState.FAILED->if(tr)"Hata" else "Failed";else->if(tr)"Kurulum bekliyor" else "Setup required"},color=if(e.state==com.vex.videoai.media.RuntimeState.READY)Color(0xFF9BE7B9) else Muted,fontSize=10.sp)}}}
      }
      "editor"->{
       if(active==null){page="projects"}else{
