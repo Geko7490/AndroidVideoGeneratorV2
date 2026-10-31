@@ -152,7 +152,7 @@ class Media3VideoExporter(context:Context) {
             val y=layer.y.coerceIn(0f,1f)*height
             val radius=(width*.045f*layer.scale.coerceIn(.25f,3f)).coerceAtLeast(12f)
             paint.color=when(layer.kind) {
-                "background" -> AndroidColor.argb(85,74,58,105)
+                "background" -> AndroidColor.argb(105,74,58,105)
                 "text" -> AndroidColor.WHITE
                 else -> AndroidColor.rgb(95+(layerIndex*17%100),65+(layerIndex*13%90),135+(layerIndex*11%100))
             }
@@ -163,11 +163,26 @@ class Media3VideoExporter(context:Context) {
                 val targetHeight=targetWidth*asset.height.toFloat()/asset.width.coerceAtLeast(1)
                 canvas.drawBitmap(asset,null,RectF(x-targetWidth/2,y-targetHeight/2,x+targetWidth/2,y+targetHeight/2),paint)
                 asset.recycle()
-            } else if(layer.kind=="background")canvas.drawRoundRect(RectF(x-radius*2,y-radius,width-radius*.2f,y+radius*3),radius, radius,paint)
-            else if(layer.kind=="text") {
-                paint.textSize=width*.045f;paint.typeface=android.graphics.Typeface.create("sans-serif-bold",android.graphics.Typeface.BOLD)
+            } else if(layer.kind=="background") {
+                canvas.drawRoundRect(RectF(x-radius*2,y-radius,width-radius*.2f,y+radius*3),radius,radius,paint)
+                paint.color=AndroidColor.argb(210,245,241,255)
+                paint.textSize=width*.026f
+                paint.typeface=android.graphics.Typeface.create("sans-serif-medium",android.graphics.Typeface.NORMAL)
+                canvas.drawText(layer.name.take(30),x+radius*.15f,y+radius*.35f,paint)
+            } else if(layer.kind=="text") {
+                paint.textSize=width*.052f;paint.typeface=android.graphics.Typeface.create("sans-serif-bold",android.graphics.Typeface.BOLD)
+                paint.setShadowLayer(5f,2f,2f,AndroidColor.BLACK)
                 canvas.drawText(layer.name.take(36),x,y,paint)
-            } else canvas.drawCircle(x,y,radius,paint)
+                paint.clearShadowLayer()
+            } else {
+                canvas.drawCircle(x,y,radius,paint)
+                paint.color=AndroidColor.WHITE
+                paint.textSize=width*.025f
+                paint.typeface=android.graphics.Typeface.create("sans-serif-bold",android.graphics.Typeface.BOLD)
+                val label=layer.name.take(22)
+                val labelWidth=paint.measureText(label)
+                canvas.drawText(label,(x-labelWidth/2).coerceIn(8f,width-labelWidth-8f),(y+radius+width*.035f).coerceAtMost(height*.78f),paint)
+            }
         }
         paint.color=AndroidColor.WHITE
         paint.textSize=width*.055f
