@@ -49,6 +49,7 @@ import com.vex.videoai.data.VideoScene
 import com.vex.videoai.media.EngineCatalog
 import com.vex.videoai.media.WhisperLocalEngine
 import com.vex.videoai.media.SrtExporter
+import com.vex.videoai.media.Media3VideoExporter
 import com.vex.videoai.models.ModelCatalog
 import com.vex.videoai.models.ModelDownloadManager
 import kotlinx.coroutines.launch
@@ -95,6 +96,7 @@ class MainActivity:ComponentActivity(){
  var model by rememberSaveable { mutableStateOf(prefs.getString("llm_model","local-model")?:"local-model") }
  var apiKey by rememberSaveable { mutableStateOf("") }
  var busy by remember { mutableStateOf(false) }
+ var renderProgress by remember { mutableIntStateOf(0) }
  var notice by remember { mutableStateOf("") }
  val scope= rememberCoroutineScope()
  val tr=language=="tr"
@@ -135,6 +137,20 @@ class MainActivity:ComponentActivity(){
     val cues=active?.scenes?.getOrNull(sceneIndex)?.subtitles.orEmpty()
     context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(SrtExporter.toSrt(cues))}?:error("Could not create the SRT file.")
    }.onSuccess{notice=if(tr)"SRT dosyası kaydedildi." else "SRT file saved."}.onFailure{notice=it.message?:"SRT export failed."}
+  }
+ }
+ val videoPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")){uri->
+  val projectToRender=active
+  if(uri!=null&&projectToRender!=null)scope.launch{
+   busy=true;renderProgress=0;notice=""
+   val temp=File(context.cacheDir,"vex-render-${projectToRender.id}.mp4")
+   try{
+    Media3VideoExporter(context).export(projectToRender,temp){renderProgress=it}
+    val output=context.contentResolver.openOutputStream(uri)?:error("Could not write to the selected destination.")
+    output.use{stream->temp.inputStream().use{input->input.copyTo(stream)}}
+    notice=if(tr)"MP4 hazır. Bu aşamada video sessizdir; altyazılar görüntüye işlenir." else "MP4 exported. This first render is silent; subtitles are burned into the frames."
+   }catch(e:Exception){notice=e.message?:"MP4 export failed."}
+   finally{temp.delete();busy=false}
   }
  }
  MaterialTheme(colorScheme=darkColorScheme(primary=Purple,background=Bg,surface=Panel,onSurface=Color.White)){
@@ -194,6 +210,7 @@ class MainActivity:ComponentActivity(){
         item{Text("Camera: ${selectedScene.cameraMovement} • Transition: ${selectedScene.transition}",color=Muted,fontSize=11.sp)}
         item{Section(if(tr)"KATMANLAR" else "CANVAS LAYERS",if(tr)"Arka plan ve ön plan öğeleri" else "Background and foreground elements");selectedScene.layers.forEach{layer->Row(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){Text(if(layer.kind=="background")"BG" else "FG",color=Purple,fontSize=10.sp,fontWeight=FontWeight.Bold);Text(layer.name,Modifier.weight(1f).padding(start=9.dp),color=Color.White,fontSize=12.sp);TextButton(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers.filterNot{it.id==layer.id}))}){Text(if(tr)"Sil" else "Remove",color=Muted)}}};Button(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers+SceneLayer(name="New visual element",kind="foreground")))},colors=ButtonDefaults.buttonColors(containerColor=Panel)){Icon(Icons.Rounded.Add,null);Text(if(tr)" Katman ekle" else " Add layer")}}
         item{Button(onClick={scope.launch{busy=true;notice="";try{val starter=ModelCatalog.assets.first { it.id=="qwen3_06b" };val gguf=modelManager.fileFor(starter);val fresh=if(gguf.exists())OnDeviceLlmClient(context).createStoryboard(active,gguf,threads=4) else LocalLlmClient().createStoryboard(active,LlmSettings(endpoint,model,apiKey));saveProject(active.copy(scenes=fresh));sceneIndex=0;notice=if(tr)"AI storyboard hazır." else "AI storyboard generated."}catch(e:Exception){notice=e.message?: "Generation failed"}finally{busy=false}}},modifier=Modifier.fillMaxWidth(),enabled=!busy,colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp) else Icon(Icons.Rounded.AutoAwesome,null);Text(if(tr)"  Yerel LLM ile storyboard üret" else "  Generate storyboard with local LLM")}}
+        item{Button(onClick={videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_-]"),"_").take(40).ifBlank{"vex-video"}+".mp4")},modifier=Modifier.fillMaxWidth(),enabled=!busy&&active.scenes.isNotEmpty(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF34303D))){Icon(Icons.Rounded.Movie,null);Text(if(tr)"  Sessiz MP4 dışa aktar" else "  Export silent MP4")};if(busy&&renderProgress>0)Text("Render: ${renderProgress}%",color=Muted,fontSize=11.sp)}
         if(notice.isNotBlank())item{Text(notice,color=if(notice.contains("generated")||notice.contains("hazır"))Color(0xFF9BE7B9) else Color(0xFFE6B66D),fontSize=12.sp)}
         item{Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF21182E))){Column(Modifier.padding(12.dp)){Text(if(tr)"Sonraki motorlar" else "Next production engines",color=Purple,fontWeight=FontWeight.Bold);Text("Kokoro TTS • Whisper subtitles • MP4 export",color=Color.White,fontSize=12.sp);Text(if(tr)"Henüz gerçek runtime bağlı değil; sahte tamamlandı durumu gösterilmez." else "Native runtimes are not connected yet; no fake completion status is shown.",color=Muted,fontSize=10.sp)}}}
        }
