@@ -12,6 +12,8 @@ data class DownloadProgress(val status:Int,val downloaded:Long,val total:Long,va
 }
 object ModelCatalog {
     val assets=listOf(
+        ModelAsset("qwen3_06b","Qwen3 0.6B Q4_K_M","On-device story planner • fast starter model","~484 MB","https://huggingface.co/QuantFactory/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B.Q4_K_M.gguf","Qwen3-0.6B.Q4_K_M.gguf","On-device LLM"),
+        ModelAsset("qwen3_4b","Qwen3 4B Q4_K_M","Higher-quality local story planning • needs more RAM","~2.5 GB","https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf","Qwen3-4B-Q4_K_M.gguf","On-device LLM"),
         ModelAsset("kokoro_int8","Kokoro INT8 ONNX","English speech model • mobile-friendly quantization","~92 MB","https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx","kokoro-v1.0.int8.onnx","Kokoro TTS"),
         ModelAsset("kokoro_voices","Kokoro voice pack","Voice embeddings required by the Kokoro runtime","~28 MB","https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin","voices-v1.0.bin","Kokoro TTS"),
         ModelAsset("whisper_tiny_en","Whisper tiny.en","English-only transcription model • smallest recommended tier","~78 MB","https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin","ggml-tiny.en.bin","Whisper")
@@ -46,9 +48,10 @@ class ModelDownloadManager(context:Context) {
             return DownloadProgress(status,downloaded,total,file)
         }
     }
+    fun fileFor(asset:ModelAsset):File = File(app.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),asset.fileName)
     fun isDownloaded(asset:ModelAsset):Boolean {
         val p=progress(asset)
-        return p?.status==DownloadManager.STATUS_SUCCESSFUL && p.file?.exists()==true
+        return p?.status==DownloadManager.STATUS_SUCCESSFUL && fileFor(asset).exists()
     }
     fun cancel(asset:ModelAsset) {
         val id=prefs.getLong(asset.id,-1L)

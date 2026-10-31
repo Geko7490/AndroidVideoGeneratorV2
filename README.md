@@ -8,7 +8,7 @@ Offline-first Android video creation studio. The interface supports Turkish and 
 - Persistent local project library.
 - Editable storyboard scene data with narration, dialogue, visual direction and layer metadata.
 - Layered canvas preview and scene timeline.
-- OpenAI-compatible local LLM endpoint adapter for structured English storyboard generation.
+- On-device llama.cpp runtime for GGUF storyboard generation, plus an OpenAI-compatible local-server fallback.
 - Explicit Kokoro TTS, Whisper transcription and MP4 export runtime contracts. Missing runtimes are reported honestly, not simulated.
 
 ## Local LLM

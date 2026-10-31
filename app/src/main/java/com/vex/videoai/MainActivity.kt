@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import com.vex.videoai.ai.LlmSettings
 import com.vex.videoai.ai.LocalLlmClient
+import com.vex.videoai.ai.OnDeviceLlmClient
 import com.vex.videoai.data.ProjectStore
 import com.vex.videoai.data.SceneLayer
 import com.vex.videoai.data.VideoProject
@@ -71,6 +72,7 @@ class MainActivity:ComponentActivity(){
 @Composable private fun VexVideoApp(){
  val context= LocalContext.current
  val store= remember { ProjectStore(context) }
+ val modelManager=remember { ModelDownloadManager(context) }
  val prefs= remember { context.getSharedPreferences("vex_video_settings",0) }
  val projects= remember { mutableStateListOf<VideoProject>().apply { addAll(store.getAll()) } }
  var language by rememberSaveable { mutableStateOf("en") }
@@ -133,7 +135,7 @@ class MainActivity:ComponentActivity(){
      "models"->ModelCenterScreen(tr)
      "settings"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
       Section(if(tr)"YEREL LLM" else "LOCAL LLM",if(tr)"OpenAI uyumlu yerel sunucu" else "OpenAI-compatible local server")
-      Text(if(tr)"Örnek: llama.cpp server, LM Studio veya Ollama OpenAI uyumlu endpoint." else "Example: llama.cpp server, LM Studio or an OpenAI-compatible Ollama endpoint.",color=Muted,fontSize=12.sp)
+      Text(if(tr)"Qwen3 GGUF modelini Model Center’dan indirirsen uygulama doğrudan cihazda çalıştırır. İstersen aşağıdaki OpenAI uyumlu yerel sunucu da kullanılabilir." else "Download a Qwen3 GGUF model in Model Center to run it directly on-device. You can also use the OpenAI-compatible local server below.",color=Muted,fontSize=12.sp)
       OutlinedTextField(endpoint,{endpoint=it},Modifier.fillMaxWidth(),label={Text("Chat completions URL")},colors=fieldColors())
       OutlinedTextField(model,{model=it},Modifier.fillMaxWidth(),label={Text(if(tr)"Model adı" else "Model name")},colors=fieldColors())
       OutlinedTextField(apiKey,{apiKey=it},Modifier.fillMaxWidth(),label={Text(if(tr)"API key (opsiyonel)" else "API key (optional)")},colors=fieldColors())
@@ -158,7 +160,7 @@ class MainActivity:ComponentActivity(){
         item{OutlinedTextField(selectedScene.visualDescription,{updateScene(selectedScene.copy(visualDescription=it))},Modifier.fillMaxWidth(),minLines=3,label={Text(if(tr)"Görsel açıklama" else "Visual direction")},colors=fieldColors())}
         item{Text("Camera: ${selectedScene.cameraMovement} • Transition: ${selectedScene.transition}",color=Muted,fontSize=11.sp)}
         item{Section(if(tr)"KATMANLAR" else "CANVAS LAYERS",if(tr)"Arka plan ve ön plan öğeleri" else "Background and foreground elements");selectedScene.layers.forEach{layer->Row(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){Text(if(layer.kind=="background")"BG" else "FG",color=Purple,fontSize=10.sp,fontWeight=FontWeight.Bold);Text(layer.name,Modifier.weight(1f).padding(start=9.dp),color=Color.White,fontSize=12.sp);TextButton(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers.filterNot{it.id==layer.id}))}){Text(if(tr)"Sil" else "Remove",color=Muted)}}};Button(onClick={updateScene(selectedScene.copy(layers=selectedScene.layers+SceneLayer(name="New visual element",kind="foreground")))},colors=ButtonDefaults.buttonColors(containerColor=Panel)){Icon(Icons.Rounded.Add,null);Text(if(tr)" Katman ekle" else " Add layer")}}
-        item{Button(onClick={scope.launch{busy=true;notice="";try{val fresh=LocalLlmClient().createStoryboard(active,LlmSettings(endpoint,model,apiKey));saveProject(active.copy(scenes=fresh));sceneIndex=0;notice=if(tr)"AI storyboard hazır." else "AI storyboard generated."}catch(e:Exception){notice=e.message?: "Generation failed"}finally{busy=false}}},modifier=Modifier.fillMaxWidth(),enabled=!busy,colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp) else Icon(Icons.Rounded.AutoAwesome,null);Text(if(tr)"  Yerel LLM ile storyboard üret" else "  Generate storyboard with local LLM")}}
+        item{Button(onClick={scope.launch{busy=true;notice="";try{val starter=ModelCatalog.assets.first { it.id=="qwen3_06b" };val gguf=modelManager.fileFor(starter);val fresh=if(gguf.exists())OnDeviceLlmClient(context).createStoryboard(active,gguf,threads=4) else LocalLlmClient().createStoryboard(active,LlmSettings(endpoint,model,apiKey));saveProject(active.copy(scenes=fresh));sceneIndex=0;notice=if(tr)"AI storyboard hazır." else "AI storyboard generated."}catch(e:Exception){notice=e.message?: "Generation failed"}finally{busy=false}}},modifier=Modifier.fillMaxWidth(),enabled=!busy,colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp) else Icon(Icons.Rounded.AutoAwesome,null);Text(if(tr)"  Yerel LLM ile storyboard üret" else "  Generate storyboard with local LLM")}}
         if(notice.isNotBlank())item{Text(notice,color=if(notice.contains("generated")||notice.contains("hazır"))Color(0xFF9BE7B9) else Color(0xFFE6B66D),fontSize=12.sp)}
         item{Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF21182E))){Column(Modifier.padding(12.dp)){Text(if(tr)"Sonraki motorlar" else "Next production engines",color=Purple,fontWeight=FontWeight.Bold);Text("Kokoro TTS • Whisper subtitles • MP4 export",color=Color.White,fontSize=12.sp);Text(if(tr)"Henüz gerçek runtime bağlı değil; sahte tamamlandı durumu gösterilmez." else "Native runtimes are not connected yet; no fake completion status is shown.",color=Muted,fontSize=10.sp)}}}
        }

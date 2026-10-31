@@ -8,6 +8,7 @@ interface VideoExportEngine { val engineName:String; suspend fun export(projectI
 enum class RuntimeState { NOT_INSTALLED,READY,RUNNING,FAILED }
 data class EngineDescriptor(val id:String,val displayName:String,val purpose:String,val state:RuntimeState,val detail:String)
 object EngineCatalog { val initial=listOf(
+ EngineDescriptor("llama","llama.cpp","On-device GGUF storyboard generation",RuntimeState.NOT_INSTALLED,"Download a GGUF model in Model Center to activate"),
  EngineDescriptor("kokoro","Kokoro TTS","English voice generation",RuntimeState.NOT_INSTALLED,"ONNX model and voice assets required"),
  EngineDescriptor("whisper","Whisper","English transcription and word timing",RuntimeState.NOT_INSTALLED,"Whisper model and native inference runtime required"),
  EngineDescriptor("renderer","Video Renderer","Layer compositing and MP4 export",RuntimeState.NOT_INSTALLED,"Media export pipeline is not connected yet")
