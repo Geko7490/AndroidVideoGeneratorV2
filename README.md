@@ -9,7 +9,9 @@ Offline-first Android video creation studio. The interface supports Turkish and 
 - Editable storyboard scene data with narration, dialogue, visual direction and layer metadata.
 - Layered canvas preview and scene timeline.
 - On-device llama.cpp runtime for GGUF storyboard generation, plus an OpenAI-compatible local-server fallback.
-- Explicit Kokoro TTS, Whisper transcription and MP4 export runtime contracts. Missing runtimes are reported honestly, not simulated.
+- On-device Whisper transcription with English-only language selection, editable timestamped subtitle cues and SRT export.
+- Kokoro TTS model download catalog; synthesis runtime is still pending integration.
+- MP4 export pipeline remains a separate pending runtime.
 
 ## Local LLM
 Configure an OpenAI-compatible chat-completions endpoint in Settings. Example local endpoint: http://127.0.0.1:8080/v1/chat/completions. The local server must be running and expose the selected model. No cloud API key is required for local inference.

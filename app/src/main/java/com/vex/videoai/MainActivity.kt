@@ -2,8 +2,11 @@ package com.vex.videoai
 
 import android.os.Bundle
 import android.app.DownloadManager
+import android.webkit.MimeTypeMap
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -40,13 +43,17 @@ import com.vex.videoai.ai.LocalLlmClient
 import com.vex.videoai.ai.OnDeviceLlmClient
 import com.vex.videoai.data.ProjectStore
 import com.vex.videoai.data.SceneLayer
+import com.vex.videoai.data.SubtitleLine
 import com.vex.videoai.data.VideoProject
 import com.vex.videoai.data.VideoScene
 import com.vex.videoai.media.EngineCatalog
+import com.vex.videoai.media.WhisperLocalEngine
+import com.vex.videoai.media.SrtExporter
 import com.vex.videoai.models.ModelCatalog
 import com.vex.videoai.models.ModelDownloadManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import java.io.File
 
 private val Bg=Color(0xFF101014)
 private val Panel=Color(0xFF1B1A22)
@@ -105,7 +112,31 @@ class MainActivity:ComponentActivity(){
  fun updateScene(scene:VideoScene){updateActive{p->p.copy(scenes=p.scenes.mapIndexed{i,s->if(i==sceneIndex)scene else s})}}
  fun addScene(){updateActive{p->p.copy(scenes=p.scenes+VideoScene(title="Scene ${p.scenes.size+1}",visualDescription="Describe the action and composition."))};sceneIndex=(active?.scenes?.size?:0)}
  fun goEditor(p:VideoProject){activeProjectId=p.id;sceneIndex=0;page="editor"}
+ val audioPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+  if(uri!=null)scope.launch{
+   busy=true;notice=""
+   val extension=MimeTypeMap.getSingleton().getExtensionFromMimeType(context.contentResolver.getType(uri))?:"wav"
+   val audioFile=File(context.cacheDir,"vex-scene-audio-${System.currentTimeMillis()}.${extension}")
+   try{
+    val input=context.contentResolver.openInputStream(uri)?:error("Could not open the selected audio file.")
+    input.use{stream->audioFile.outputStream().use{out->stream.copyTo(out)}}
+    val whisperAsset=ModelCatalog.assets.first{it.id=="whisper_tiny_en"}
+    val cues=WhisperLocalEngine(context).transcribeEnglish(audioFile,modelManager.fileFor(whisperAsset))
+    updateActive{p->p.copy(scenes=p.scenes.mapIndexed{i,scene->if(i==sceneIndex)scene.copy(subtitles=cues)else scene})}
+    notice=if(tr)"Whisper ${cues.size} altyazı satırı oluşturdu." else "Whisper created ${cues.size} subtitle cues."
+   }catch(e:Exception){notice=e.message?:"Whisper transcription failed."}
+   finally{audioFile.delete();busy=false}
+  }
+ }
 
+ val srtPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/x-subrip")){uri->
+  if(uri!=null){
+   runCatching{
+    val cues=active?.scenes?.getOrNull(sceneIndex)?.subtitles.orEmpty()
+    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(SrtExporter.toSrt(cues))}?:error("Could not create the SRT file.")
+   }.onSuccess{notice=if(tr)"SRT dosyası kaydedildi." else "SRT file saved."}.onFailure{notice=it.message?:"SRT export failed."}
+  }
+ }
  MaterialTheme(colorScheme=darkColorScheme(primary=Purple,background=Bg,surface=Panel,onSurface=Color.White)){
   Scaffold(containerColor=Bg, bottomBar={
    if(page!="editor") NavigationBar(containerColor=Panel){
@@ -156,6 +187,8 @@ class MainActivity:ComponentActivity(){
         item{OutlinedTextField(selectedScene.title,{updateScene(selectedScene.copy(title=it))},Modifier.fillMaxWidth(),label={Text(if(tr)"Sahne adı" else "Scene title")},singleLine=true,colors=fieldColors())}
         item{Text(if(tr)"Süre: ${selectedScene.durationSeconds} saniye" else "Duration: ${selectedScene.durationSeconds} seconds",color=Muted,fontSize=12.sp);Slider(selectedScene.durationSeconds.toFloat(),{updateScene(selectedScene.copy(durationSeconds=it.toInt().coerceIn(1,120)))},valueRange=1f..30f)}
         item{OutlinedTextField(selectedScene.narration,{updateScene(selectedScene.copy(narration=it))},Modifier.fillMaxWidth(),minLines=3,label={Text("English narration")},colors=fieldColors())}
+        item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Section(if(tr)"WHISPER ALTYAZILARI" else "WHISPER SUBTITLES",if(tr)"Bu sahnenin ses dosyasını seç" else "Choose this scene's voiceover audio")};Button(onClick={audioPicker.launch(arrayOf("audio/wav","audio/x-wav","audio/mpeg","audio/flac"))},enabled=!busy,colors=ButtonDefaults.buttonColors(containerColor=Purple)){if(busy)CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp)else Icon(Icons.Rounded.ClosedCaption,null);Text(if(tr)" Seslendiriyi çöz" else " Transcribe audio")}}}
+        item{if(selectedScene.subtitles.isEmpty())Text(if(tr)"Henüz altyazı yok. Whisper ile ses dosyasından oluşturabilir veya elle ekleyebilirsin." else "No subtitle cues yet. Transcribe an audio file with Whisper or add one manually.",color=Muted,fontSize=11.sp) else selectedScene.subtitles.forEach{cue->Column(Modifier.fillMaxWidth().padding(vertical=5.dp)){Text("${cue.startMs/1000.0}s – ${cue.endMs/1000.0}s",color=Purple,fontSize=10.sp);OutlinedTextField(cue.text,{text->updateScene(selectedScene.copy(subtitles=selectedScene.subtitles.map{if(it.id==cue.id)it.copy(text=text)else it}))},Modifier.fillMaxWidth(),minLines=1,colors=fieldColors());TextButton(onClick={updateScene(selectedScene.copy(subtitles=selectedScene.subtitles.filterNot{it.id==cue.id}))}){Text(if(tr)"Satırı sil" else "Remove cue",color=Muted)}}};Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){Button(onClick={updateScene(selectedScene.copy(subtitles=selectedScene.subtitles+SubtitleLine(startMs=0,endMs=selectedScene.durationSeconds*1000L,text="New English subtitle")))},colors=ButtonDefaults.buttonColors(containerColor=Panel)){Icon(Icons.Rounded.Add,null);Text(if(tr)" Elle altyazı ekle" else " Add cue")};if(selectedScene.subtitles.isNotEmpty())OutlinedButton(onClick={srtPicker.launch("scene-${sceneIndex+1}.srt")}){Text("Export SRT")}}}
         item{OutlinedTextField(selectedScene.dialogue,{updateScene(selectedScene.copy(dialogue=it))},Modifier.fillMaxWidth(),minLines=2,label={Text("English dialogue")},colors=fieldColors())}
         item{OutlinedTextField(selectedScene.visualDescription,{updateScene(selectedScene.copy(visualDescription=it))},Modifier.fillMaxWidth(),minLines=3,label={Text(if(tr)"Görsel açıklama" else "Visual direction")},colors=fieldColors())}
         item{Text("Camera: ${selectedScene.cameraMovement} • Transition: ${selectedScene.transition}",color=Muted,fontSize=11.sp)}
