@@ -13,7 +13,7 @@ Offline-first Android video creation studio. The interface supports Turkish and 
 - On-device llama.cpp runtime for GGUF storyboard generation, plus an OpenAI-compatible local-server fallback.
 - On-device Whisper transcription with English-only language selection, editable timestamped subtitle cues and SRT export.
 - Android offline English TTS fallback that generates and attaches per-scene WAV voiceovers; Kokoro ONNX models are downloadable, but native Kokoro inference is still pending integration.
-- Media3 Transformer MP4 export from storyboard scene frames, with subtitle cues burned into the rendered frames. If every scene has an attached voiceover file, the audio clips are included sequentially; otherwise the export is silent.
+- Media3 Transformer MP4 export with selectable 480p–4K long-edge resolution and 24/30/60 fps; subtitle cues are burned into the rendered frames. If every scene has an attached voiceover file, audio clips are included sequentially; otherwise the export is silent.
 
 ## Voice generation and subtitles
 

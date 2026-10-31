@@ -282,7 +282,7 @@ item{Button(onClick={videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_
      if(progress?.status==DownloadManager.STATUS_FAILED)Text(if(tr)"İndirme başarısız. Tekrar deneyebilirsin." else "Download failed. You can retry.",color=Color(0xFFE6B66D),fontSize=11.sp)
      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
       if(running)OutlinedButton(onClick={manager.cancel(asset);refresh++}){Text(if(tr)"İptal" else "Cancel")}
-      else if(done)Text(if(tr)"İndirildi • Runtime bağlantısı bekleniyor" else "Downloaded • Runtime integration pending",color=Color(0xFF9BE7B9),fontSize=10.sp,modifier=Modifier.padding(8.dp))
+      else if(done)Text(when(asset.group){"On-device LLM"->if(tr)"İndirildi • Yerel storyboard için hazır" else "Downloaded • Ready for local storyboard";"Whisper"->if(tr)"İndirildi • Altyazı üretimi için hazır" else "Downloaded • Ready for transcription";else->if(tr)"İndirildi • Kokoro runtime bağlantısı bekleniyor" else "Downloaded • Kokoro runtime integration pending"},color=Color(0xFF9BE7B9),fontSize=10.sp,modifier=Modifier.padding(8.dp))
       else Button(onClick={manager.enqueue(asset);refresh++},colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(tr)"İndir" else "Download")}
      }
     }

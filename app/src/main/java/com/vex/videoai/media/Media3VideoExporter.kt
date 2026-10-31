@@ -14,10 +14,15 @@ import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import com.vex.videoai.data.VideoProject
 import com.vex.videoai.data.VideoScene
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -56,25 +61,39 @@ class Media3VideoExporter(context:Context) {
             withContext(Dispatchers.Main.immediate) {
                 suspendCancellableCoroutine { continuation ->
                     val transformer=Transformer.Builder(app).build()
+                    var progressJob:Job?=null
                     val listener=object:Transformer.Listener {
                         override fun onCompleted(composition:Composition,exportResult:ExportResult) {
+                            progressJob?.cancel()
                             transformer.removeListener(this)
                             onProgress(100)
                             if(continuation.isActive)continuation.resume(outputFile)
                         }
                         override fun onError(composition:Composition,exportResult:ExportResult,exportException:ExportException) {
+                            progressJob?.cancel()
                             transformer.removeListener(this)
                             if(continuation.isActive)continuation.resumeWithException(exportException)
                         }
                     }
                     transformer.addListener(listener)
                     continuation.invokeOnCancellation {
+                        progressJob?.cancel()
                         transformer.cancel()
                         transformer.removeListener(listener)
                     }
                     try {
                         onProgress(35)
                         transformer.start(composition,outputFile.absolutePath)
+                        progressJob=CoroutineScope(continuation.context).launch {
+                            while(continuation.isActive) {
+                                val holder=ProgressHolder()
+                                val state=withContext(Dispatchers.Main.immediate) { transformer.getProgress(holder) }
+                                if(state==Transformer.PROGRESS_STATE_AVAILABLE) {
+                                    withContext(Dispatchers.Main.immediate) { onProgress(35+(holder.progress*65/100).coerceIn(0,64)) }
+                                }
+                                delay(500)
+                            }
+                        }
                     } catch(error:Throwable) {
                         transformer.removeListener(listener)
                         if(continuation.isActive)continuation.resumeWithException(error)
