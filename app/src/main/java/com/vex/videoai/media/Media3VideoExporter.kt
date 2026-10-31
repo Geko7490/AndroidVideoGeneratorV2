@@ -49,9 +49,12 @@ class Media3VideoExporter(context:Context) {
                 EditedMediaItem.Builder(mediaItem).setFrameRate(frameRate.coerceIn(24,60)).build()
             }
             val sequence=EditedMediaItemSequence.withVideoFrom(items)
-            val audioFiles=project.scenes.map { File(it.voiceoverPath) }
-            val composition=if(audioFiles.all { it.exists()&&it.length()>0L }) {
-                val audioItems=audioFiles.map { file ->
+            val audioFiles=project.scenes.map { scene ->
+                scene.voiceoverPath.takeIf { it.isNotBlank() }?.let(::File)
+            }
+            val hasCompleteAudio=audioFiles.isNotEmpty()&&audioFiles.all { file -> file!=null&&file.isFile&&file.length()>44L }
+            val composition=if(hasCompleteAudio) {
+                val audioItems=audioFiles.filterNotNull().map { file ->
                     EditedMediaItem.Builder(MediaItem.Builder().setUri(file.toUri()).build()).build()
                 }
                 val audioSequence=EditedMediaItemSequence.withAudioFrom(audioItems)
