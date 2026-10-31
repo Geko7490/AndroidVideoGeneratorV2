@@ -11,6 +11,7 @@ import com.vex.videoai.media.KokoroEnglishSpeechEngine
 import com.vex.videoai.media.Media3VideoExporter
 import com.vex.videoai.media.SilentWavWriter
 import com.vex.videoai.media.WhisperLocalEngine
+import com.vex.videoai.media.WavDurationAligner
 import java.io.File
 
 enum class ProductionStage(val label:String) { PREPARING("Preparing"),STORYBOARD("LLM • Script and storyboard"),VOICEOVER("Speech • Scene voiceovers"),SUBTITLES("Whisper • English subtitles"),RENDER("Render • MP4"),COMPLETE("Complete") }
@@ -54,6 +55,7 @@ class SequentialVideoProduction(private val context:Context) {
                     val spokenText=spokenLines.joinToString("\n")
                     val estimatedRate=(spokenText.split(Regex("\\s+")).size/(scene.durationSeconds*2.5f)).coerceIn(.85f,1.25f)
                     if(kokoro!=null)kokoro!!.synthesize(spokenText,audio,estimatedRate) else androidSpeech.synthesize(spokenText,audio,rate=estimatedRate)
+                    WavDurationAligner.padToDuration(audio,scene.durationSeconds)
                     spokenSceneIndexes.add(index)
                 }
                 voiced.add(scene.copy(voiceoverPath=audio.absolutePath))
