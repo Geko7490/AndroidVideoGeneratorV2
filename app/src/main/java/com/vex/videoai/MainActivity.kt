@@ -110,6 +110,7 @@ class MainActivity:ComponentActivity(){
  var pendingImageSceneId by rememberSaveable { mutableStateOf("") }
  var pendingImageProjectId by rememberSaveable { mutableStateOf("") }
  var notice by remember { mutableStateOf("") }
+ LaunchedEffect(profile){exportResolution=profile.defaultResolution;exportFps=profile.defaultFps}
  val scope= rememberCoroutineScope()
  val tr=language=="tr"
  val active=projects.firstOrNull { it.id==activeProjectId }
@@ -120,7 +121,7 @@ class MainActivity:ComponentActivity(){
  fun createProject(){
   val seconds=when(duration){"30s"->30;"45s"->45;"60s"->60;"90s"->90;"3m"->180;else->45}
   val p=VideoProject(title=idea.trim().take(52).ifBlank{"Untitled video"},idea=idea.trim(),category=category,durationSeconds=seconds,aspectRatio=ratio,visualStyle=style,
-   scenes=listOf(VideoScene(title="Opening scene",durationSeconds=6,visualDescription="Establish the location, mood and main subject.",layers=listOf(SceneLayer(name="Environment",kind="background"),SceneLayer(name="Main subject",kind="foreground")))))
+   scenes=listOf(VideoScene(title="Scene 1",durationSeconds=6,visualDescription="Begin immediately with the first meaningful story action; no intro or title card.",layers=listOf(SceneLayer(name="Environment",kind="background"),SceneLayer(name="Main subject",kind="foreground")))))
   saveProject(p);activeProjectId=p.id;sceneIndex=0;page="editor"
  }
  fun updateScene(scene:VideoScene){updateActive{p->p.copy(scenes=p.scenes.mapIndexed{i,s->if(i==sceneIndex)scene else s})}}
@@ -260,7 +261,7 @@ class MainActivity:ComponentActivity(){
         item{Section(if(tr)"DIŞA AKTARMA AYARLARI" else "EXPORT SETTINGS",if(tr)"Çözünürlük ve kare hızı" else "Resolution and frame rate");Text(if(tr)"Uzun kenar çözünürlüğü" else "Long-edge resolution",color=Muted,fontSize=10.sp);ChoiceRow(listOf("480p","720p","1080p","1440p","2160p"),exportResolution){exportResolution=it};Text(if(tr)"Kare hızı" else "Frame rate",color=Muted,fontSize=10.sp);ChoiceRow(listOf("24","30","60"),exportFps){exportFps=it};if(exportResolution=="2160p")Text(if(tr)"4K dışa aktarma yüksek RAM ve depolama kullanır." else "4K export uses substantial memory and storage.",color=Color(0xFFE6B66D),fontSize=10.sp)}
 item{Button(onClick={videoPicker.launch(active.title.replace(Regex("[^A-Za-z0-9_-]"),"_").take(40).ifBlank{"vex-video"}+".mp4")},modifier=Modifier.fillMaxWidth(),enabled=!busy&&active.scenes.isNotEmpty(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF34303D))){Icon(Icons.Rounded.Movie,null);Text(if(tr)"  MP4 dışa aktar" else "  Export MP4")};if(busy&&renderProgress>0)Text("Render: ${renderProgress}%",color=Muted,fontSize=11.sp)}
         if(notice.isNotBlank())item{Text(notice,color=if(notice.contains("generated")||notice.contains("hazır"))Color(0xFF9BE7B9) else Color(0xFFE6B66D),fontSize=12.sp)}
-        item{Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF21182E))){Column(Modifier.padding(12.dp)){Text(if(tr)"Sonraki motorlar" else "Next production engines",color=Purple,fontWeight=FontWeight.Bold);Text("Kokoro TTS • Whisper subtitles • MP4 export",color=Color.White,fontSize=12.sp);Text(if(tr)"Henüz gerçek runtime bağlı değil; sahte tamamlandı durumu gösterilmez." else "Native runtimes are not connected yet; no fake completion status is shown.",color=Muted,fontSize=10.sp)}}}
+        item{Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF21182E))){Column(Modifier.padding(12.dp)){Text(if(tr)"ÜRETİM ZİNCİRİ" else "PRODUCTION CHAIN",color=Purple,fontWeight=FontWeight.Bold);Text("LLM → Speech → Whisper → MP4",color=Color.White,fontSize=12.sp);Text(if(tr)"LLM sahneleri, anlatıcı metnini ve karakter diyaloglarını üretir. Şu an çevrimdışı Android TTS ses motoru kullanılır; Kokoro ONNX entegrasyonu sonraki motor adımıdır." else "The LLM creates scenes, narration and character dialogue. Offline Android TTS is the current speech fallback; Kokoro ONNX integration remains a later engine step.",color=Muted,fontSize=10.sp)}}}
        }
       }
      }

@@ -25,6 +25,20 @@ class ScenePlanningContractTest {
         assertTrue(prompt.contains("Target duration: 45 seconds"))
     }
 
+    @Test
+    fun generatedVideoStartsWithStoryActionAndHasNoIntro() {
+        val prompt=ScenePlanningContract.systemPrompt()
+        assertTrue(prompt.contains("Do NOT create a separate intro"))
+        assertTrue(prompt.contains("first meaningful action"))
+    }
+
+    @Test
+    fun dialogueRequiresSpeakerIdentity() {
+        val prompt=ScenePlanningContract.systemPrompt()
+        assertTrue(prompt.contains("speaker"))
+        assertTrue(prompt.contains("exact English line"))
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun blankIdeaIsRejected() {
         ScenePlanningContract.userPrompt(

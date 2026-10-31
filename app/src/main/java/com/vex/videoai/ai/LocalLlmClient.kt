@@ -12,14 +12,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-data class LlmSettings(val endpoint:String,val model:String,val apiKey:String="")
+data class LlmSettings(val endpoint:String,val model:String,val apiKey:String="",val maxTokens:Int=1800)
 class LocalLlmClient {
  suspend fun createStoryboard(project:VideoProject,settings:LlmSettings):List<VideoScene> = withContext(Dispatchers.IO) {
   require(settings.endpoint.startsWith("http://")||settings.endpoint.startsWith("https://")) { "Endpoint must start with http:// or https://" }
   require(settings.model.isNotBlank()) { "Enter the local model name." }
   val category=ContentType.entries.firstOrNull { it.id==project.category }?:ContentType.STORY
   val req=ScenePlanningRequest(project.idea,category,project.durationSeconds,project.aspectRatio,project.visualStyle)
-  val body=JSONObject().apply { put("model",settings.model);put("temperature",.7);put("messages",JSONArray().apply { put(JSONObject().put("role","system").put("content",ScenePlanningContract.systemPrompt()));put(JSONObject().put("role","user").put("content",ScenePlanningContract.userPrompt(req))) });put("response_format",JSONObject().put("type","json_object")) }
+  val body=JSONObject().apply { put("model",settings.model);put("temperature",.7);put("max_tokens",settings.maxTokens.coerceIn(512,4096));put("messages",JSONArray().apply { put(JSONObject().put("role","system").put("content",ScenePlanningContract.systemPrompt()));put(JSONObject().put("role","user").put("content",ScenePlanningContract.userPrompt(req))) });put("response_format",JSONObject().put("type","json_object")) }
   val c=URL(settings.endpoint).openConnection() as HttpURLConnection
   try {
    c.requestMethod="POST";c.connectTimeout=15000;c.readTimeout=180000;c.doOutput=true;c.setRequestProperty("Content-Type","application/json")
@@ -35,7 +35,7 @@ class LocalLlmClient {
    require(start>=0&&end>start) { "The model did not return a JSON scene plan." }
    val plan=JSONObject(message.substring(start,end+1));val a=plan.optJSONArray("scenes")?:error("The model response has no scenes array.")
    val result=(0 until a.length()).mapNotNull { i->a.optJSONObject(i)?.let { s->
-    val d=s.optJSONArray("dialogue")?:JSONArray();val dialogue=(0 until d.length()).map { d.optString(it) }.joinToString("\n")
+    val d=s.optJSONArray("dialogue")?:JSONArray();val dialogue=(0 until d.length()).map { index -> val entry=d.opt(index);if(entry is JSONObject) entry.optString("speaker","Character")+": "+entry.optString("text") else entry.toString() }.joinToString("\n")
     val bg=s.optJSONArray("backgroundLayers")?:JSONArray();val fg=s.optJSONArray("foregroundLayers")?:JSONArray()
     val layers=buildList { for(k in 0 until bg.length()) add(SceneLayer(name=bg.optString(k),kind="background",x=.5f,y=.38f,scale=(1f+k*.12f).coerceAtMost(1.8f)));for(k in 0 until fg.length()) add(SceneLayer(name=fg.optString(k),kind="foreground",x=.25f+(k%3)*.25f,y=.55f+(k/3)*.12f,scale=1f)) }
     VideoScene(title=s.optString("title","Scene "+(i+1)),durationSeconds=s.optInt("durationSeconds",6).coerceIn(1,120),narration=s.optString("narration"),dialogue=dialogue,visualDescription=s.optString("visualDescription"),cameraMovement=s.optString("cameraMovement","Static"),transition=s.optString("transition","Cut"),layers=layers)

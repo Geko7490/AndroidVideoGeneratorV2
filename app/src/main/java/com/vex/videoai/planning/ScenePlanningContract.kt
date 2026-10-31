@@ -58,11 +58,11 @@ object ScenePlanningContract {
         PRODUCTION RULES:
         - Follow the selected content format and its creative direction.
         - Respect the requested total duration. Allocate realistic scene durations; never cram long dialogue into a short scene.
-        - Every scene must describe visible action, composition, environment, lighting and subject placement.
+        - Do NOT create a separate intro, opening bumper, logo animation, title card or generic establishing-only opening. Start scene 1 immediately with the story's first meaningful action, spoken hook or visual event. The video begins directly with scene 1.\n        - Every scene must describe visible action, composition, environment, lighting and subject placement.
         - Prefer layered visual elements: background layers, foreground layers and independent movable objects.
         - Describe camera movement and sound effects separately.
         - Maintain character, prop, location and wardrobe continuity across scenes.
-        - Keep narration natural and speakable. Dialogue must sound conversational.
+        - Keep narration natural and speakable. Dialogue must sound conversational.\n        - Every dialogue entry must identify who speaks with a speaker name and the exact English line. Put narration and dialogue in the order they should be heard.
         - For educational, history and documentary content, do not fabricate facts, dates, sources or quotations.
         - For mystery content, label speculation as speculation.
         - Return valid JSON only. Do not wrap it in Markdown fences.
@@ -78,7 +78,7 @@ object ScenePlanningContract {
             "id": 1,
             "durationSeconds": 6,
             "narration": "English narration",
-            "dialogue": ["English dialogue"],
+            "dialogue": [{"speaker": "Character name", "text": "English spoken line"}],
             "visualDescription": "Detailed scene composition and action",
             "backgroundLayers": ["Sky", "Distant environment"],
             "foregroundLayers": ["Main subject", "Foreground prop"],
@@ -104,7 +104,7 @@ object ScenePlanningContract {
             - User idea: ${request.idea}
 
             Return English-only video content in the exact JSON shape from the system instructions.
-            Plan enough scenes to cover the duration naturally. Include usable layer descriptions for every scene.
+            Plan enough scenes to cover the duration naturally. Include usable layer descriptions for every scene. Do not add an intro scene; start with the first real story beat.
         """.trimIndent()
     }
 }
