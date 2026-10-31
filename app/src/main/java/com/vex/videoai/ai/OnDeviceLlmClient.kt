@@ -8,6 +8,7 @@ import com.vex.videoai.data.VideoScene
 import com.vex.videoai.planning.ContentType
 import com.vex.videoai.planning.ScenePlanningContract
 import com.vex.videoai.planning.ScenePlanningRequest
+import com.vex.videoai.planning.SceneDurationNormalizer
 import dev.ffmpegkit.llama.Llama
 import dev.ffmpegkit.llama.LlamaConfig
 import org.json.JSONArray
@@ -30,13 +31,13 @@ class OnDeviceLlmClient(private val context:Context) {
                 systemPrompt=ScenePlanningContract.systemPrompt(),
                 maxTokens=1800
             )
-            return parseEnglishScenes(result.text)
+            return parseEnglishScenes(result.text,project.durationSeconds)
         } finally {
             Llama.releaseModel(model)
         }
     }
 
-    private fun parseEnglishScenes(text:String):List<VideoScene> {
+    private fun parseEnglishScenes(text:String,targetDurationSeconds:Int):List<VideoScene> {
         val start=text.indexOf('{');val end=text.lastIndexOf('}')
         require(start>=0 && end>start) { "The on-device model did not return a JSON scene plan. Try the larger model." }
         val plan=JSONObject(text.substring(start,end+1))
@@ -64,6 +65,6 @@ class OnDeviceLlmClient(private val context:Context) {
             scene.narration.all { it.code<128 } && scene.dialogue.all { it.code<128 } &&
             scene.visualDescription.all { it.code<128 } && scene.title.all { it.code<128 }
         }) { "The model generated non-English video content. Retry; output must be English." }
-        return parsed
+        return SceneDurationNormalizer.normalize(parsed,targetDurationSeconds)
     }
 }

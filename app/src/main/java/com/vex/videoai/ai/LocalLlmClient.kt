@@ -5,6 +5,7 @@ import com.vex.videoai.data.VideoScene
 import com.vex.videoai.planning.ContentType
 import com.vex.videoai.planning.ScenePlanningContract
 import com.vex.videoai.planning.ScenePlanningRequest
+import com.vex.videoai.planning.SceneDurationNormalizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -41,7 +42,7 @@ class LocalLlmClient {
    } }
    require(result.isNotEmpty()) { "The model returned no usable scenes." }
    require(result.all { it.narration.all { ch->ch.code<128 }&&it.dialogue.all { ch->ch.code<128 } }) { "The model generated non-English narration or dialogue. Retry; video language must be English." }
-   result
+   SceneDurationNormalizer.normalize(result,project.durationSeconds)
   } finally { c.disconnect() }
  }
 }
