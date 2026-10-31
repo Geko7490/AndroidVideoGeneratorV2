@@ -8,12 +8,14 @@ Offline-first Android video creation studio. The interface supports Turkish and 
 - LLM-generated scene plans include narration, speaker-labelled dialogue, visual direction, layers, camera movement and transitions.
 - No separate intro, logo bumper or title-card scene is requested; the first scene starts with the first meaningful story action.
 - Sequential full-video pipeline: LLM storyboard → per-scene speech → Whisper English subtitles → MP4 render.
-- Scenes with no narration or dialogue are kept silent instead of failing the whole project; a valid silent PCM audio segment preserves their place in the audio sequence.
+- The selected local LLM model can be Qwen3 0.6B or Qwen3 4B GGUF; the selected model is used when downloaded, otherwise the configured OpenAI-compatible local-server fallback is used.
 - Low / Mid / High profiles change on-device LLM CPU threads, context size, token budget and automatic export resolution/frame rate.
-- Local model choice supports Qwen3 0.6B and Qwen3 4B GGUF. The selected model is used only when downloaded; otherwise the configured OpenAI-compatible local-server fallback is used.
+- Kokoro Android ONNX neural TTS is integrated. Download the INT8 ONNX model in Model Center to use it; if it is not installed or cannot initialize, Android system TTS is used as a fallback.
+- Kokoro free runtime currently bundles one English voice (`af_heart`); separate character voices are not yet available in this integration.
+- Scenes with no narration or dialogue remain silent instead of failing; a valid silent PCM WAV clip preserves their place in the audio sequence.
 - Whisper tiny.en is loaded once for a batch of speech scenes. Silent scenes are skipped during transcription.
 - On-device llama.cpp runtime for GGUF storyboard generation.
-- Offline Android English system TTS currently creates scene WAV files. Kokoro ONNX files can be downloaded, but Kokoro inference and multi-speaker voice selection are not yet integrated.
+- On-device Whisper English transcription with editable timestamped subtitle cues and SRT export.
 - Canvas layer controls and PNG/JPEG/WebP image import; assets are copied to app-private project storage and included in MP4 rendering.
 - Media3 Transformer MP4 export with selectable 480p–4K resolution and 24/30/60 fps. Full production uses the selected profile preset.
 
@@ -24,8 +26,8 @@ Offline-first Android video creation studio. The interface supports Turkish and 
 - Actual LLM thread count is capped by available CPU cores. High may increase heat, battery use and memory pressure; it does not guarantee GPU acceleration.
 
 ## Known limitations
-- Speech currently uses the Android system TTS voice, not Kokoro. Speaker names are preserved in the generated dialogue, but distinct character voices are not yet rendered.
-- Voiceover clip durations are not yet automatically time-stretched to each scene duration; long speech can extend beyond its intended visual beat.
+- The current free Kokoro Android AAR bundles one voice; multi-speaker character voice assignment is not yet implemented.
+- Voiceover clip durations are not yet automatically time-stretched to exact scene duration; unusually long speech may extend beyond its visual beat.
 - Camera movement and transitions are storyboard metadata; animated camera effects and transition rendering are not yet complete.
 - Imported image assets and native vector placeholders are supported; AI image generation is not integrated.
 - Detailed audio mixing, device-specific memory safeguards, cancellation and physical-device testing remain.

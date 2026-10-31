@@ -36,6 +36,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
     implementation("dev.ffmpegkit-maintained:whisper-android:1.0.0")
+    implementation("dev.ffmpegkit-maintained:kokoro-android:0.1.0")
     implementation("androidx.media3:media3-transformer:1.9.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
