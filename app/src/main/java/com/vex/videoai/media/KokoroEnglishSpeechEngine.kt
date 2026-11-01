@@ -36,7 +36,6 @@ class KokoroEnglishSpeechEngine(private val context:Context,private val archiveF
     }
     suspend fun synthesize(text:String,output:File,speed:Float=1f,speakerId:Int=0):File=withContext(Dispatchers.IO) {
         require(text.isNotBlank()) { "Kokoro cannot synthesize empty text." }
-        require(text.all{it.code<128}) { "Kokoro voiceover text must be English." }
         val tts=engine?:error("Kokoro is not initialized. Download its full model bundle in Model Center.")
         output.parentFile?.mkdirs()
         val generated=tts.generateWithConfig(text,GenerationConfig(sid=speakerId.coerceIn(0,10),speed=speed.coerceIn(.75f,1.35f),silenceScale=0.2f))

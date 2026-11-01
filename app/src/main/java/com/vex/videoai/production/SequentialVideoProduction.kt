@@ -14,6 +14,7 @@ import com.vex.videoai.media.SilentWavWriter
 import com.vex.videoai.media.WhisperLocalEngine
 import com.vex.videoai.media.WavDurationAligner
 import java.io.File
+import kotlinx.coroutines.CancellationException
 
 enum class ProductionStage(val label:String) { PREPARING("Preparing"),STORYBOARD("LLM • Script and storyboard"),VOICEOVER("Speech • Scene voiceovers"),SUBTITLES("Whisper • English subtitles"),RENDER("Render • MP4"),COMPLETE("Complete") }
 data class ProductionProgress(val stage:ProductionStage,val completed:Int,val total:Int,val detail:String="")
@@ -36,7 +37,7 @@ class SequentialVideoProduction(private val context:Context) {
             catch(error:Exception) { candidate.release();kokoroFallbackReason=error.message?: "Kokoro initialization failed" }
         }
         val androidSpeech=AndroidEnglishSpeechEngine(context)
-        val speechName=if(kokoro!=null) "Kokoro neural TTS" else if(kokoroFallbackReason.isNotBlank()) "Android TTS fallback • Kokoro unavailable: "+kokoroFallbackReason.take(90) else "Android system TTS fallback"
+        var speechName=if(kokoro!=null) "Kokoro neural TTS" else if(kokoroFallbackReason.isNotBlank()) "Android TTS fallback • Kokoro unavailable: "+kokoroFallbackReason.take(90) else "Android system TTS fallback"
         val audioDir=File(context.filesDir,"vex-video-projects/"+source.id).apply{mkdirs()}
         try {
             val voiced=mutableListOf<VideoScene>()
@@ -49,9 +50,20 @@ class SequentialVideoProduction(private val context:Context) {
                 } else {
                     val spokenText=utterances.joinToString("\n"){it.text}
                     val estimatedRate=(spokenText.split(Regex("\\s+")).size/(scene.durationSeconds*2.5f)).coerceIn(.85f,1.25f)
-                    SceneSpeechComposer.synthesize(utterances,audio,estimatedRate){text,file,rate,pitch,speakerId->
-                        if(kokoro!=null)kokoro!!.synthesize(text,file,rate,speakerId)
-                        else androidSpeech.synthesize(text,file,rate=rate,pitch=pitch)
+                    suspend fun synthesizeWithAndroid()=SceneSpeechComposer.synthesize(utterances,audio,estimatedRate){text,file,rate,pitch,_->androidSpeech.synthesize(text,file,rate=rate,pitch=pitch)}
+                    val activeKokoro=kokoro
+                    if(activeKokoro==null) synthesizeWithAndroid()
+                    else try {
+                        SceneSpeechComposer.synthesize(utterances,audio,estimatedRate){text,file,rate,_,speakerId->activeKokoro.synthesize(text,file,rate,speakerId)}
+                    } catch(error:Exception) {
+                        if(error is CancellationException)throw error
+                        activeKokoro.release();if(kokoro===activeKokoro)kokoro=null
+                        speechName="Android TTS fallback • Kokoro generation failed"
+                        synthesizeWithAndroid()
+                    } catch(error:LinkageError) {
+                        activeKokoro.release();if(kokoro===activeKokoro)kokoro=null
+                        speechName="Android TTS fallback • Kokoro native runtime failed"
+                        synthesizeWithAndroid()
                     }
                     WavDurationAligner.padToDuration(audio,scene.durationSeconds)
                     spokenSceneIndexes.add(index)
