@@ -120,11 +120,11 @@ class Media3VideoExporter(context:Context) {
             val cues=scene.subtitles.filter { it.text.isNotBlank() && it.endMs>it.startMs }
                 .map { it.copy(startMs=it.startMs.coerceIn(0,totalMs),endMs=it.endMs.coerceIn(0,totalMs)) }
                 .filter { it.endMs>it.startMs }
-            val points=(listOf(0L,totalMs)+cues.flatMap { listOf(it.startMs,it.endMs) }).distinct().sorted()
-            points.zipWithNext().forEach { (start,end) ->
-                if(end<=start)return@forEach
+            SceneFramePlanner.plan(totalMs,cues).forEach { interval ->
+                val start=interval.startMs
+                val end=interval.endMs
                 val caption=cues.firstOrNull { it.startMs<end && it.endMs>start }?.text.orEmpty()
-                val bitmap=drawScene(project,scene,caption,width,height)
+                val bitmap=drawScene(project,scene,caption,width,height,interval.progress)
                 val file=File(dir,"frame-${index.toString().padStart(4,'0')}.png");index++
                 FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
                 bitmap.recycle()
@@ -135,7 +135,7 @@ class Media3VideoExporter(context:Context) {
         return result
     }
 
-    private fun drawScene(project:VideoProject,scene:VideoScene,caption:String,width:Int,height:Int):Bitmap {
+    private fun drawScene(project:VideoProject,scene:VideoScene,caption:String,width:Int,height:Int,progress:Float):Bitmap {
         val bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888)
         val canvas=AndroidCanvas(bitmap)
         val paint=Paint(Paint.ANTI_ALIAS_FLAG)
@@ -147,6 +147,12 @@ class Media3VideoExporter(context:Context) {
         canvas.drawCircle(width*.78f,height*.22f,width*.13f,paint)
         paint.color=AndroidColor.argb(100,40,32,58)
         canvas.drawRect(0f,height*.66f,width.toFloat(),height.toFloat(),paint)
+        val camera=scene.cameraMovement.lowercase()
+        val zoom=when { camera.contains("zoom")||camera.contains("push")||camera.contains("dolly") -> 1f+progress*.09f;else -> 1.035f }
+        val pan=when { camera.contains("left") -> -width*.035f*progress;camera.contains("right") -> width*.035f*progress;camera.contains("pan") -> width*.035f*(progress-.5f);else -> 0f }
+        canvas.save()
+        canvas.scale(zoom,zoom,width/2f,height/2f)
+        canvas.translate(pan/zoom,0f)
         scene.layers.filter { it.visible }.forEachIndexed { layerIndex,layer ->
             val x=layer.x.coerceIn(0f,1f)*width
             val y=layer.y.coerceIn(0f,1f)*height
@@ -184,6 +190,7 @@ class Media3VideoExporter(context:Context) {
                 canvas.drawText(label,(x-labelWidth/2).coerceIn(8f,width-labelWidth-8f),(y+radius+width*.035f).coerceAtMost(height*.78f),paint)
             }
         }
+        canvas.restore()
         paint.color=AndroidColor.WHITE
         paint.textSize=width*.055f
         paint.typeface=android.graphics.Typeface.create("sans-serif-bold",android.graphics.Typeface.BOLD)
