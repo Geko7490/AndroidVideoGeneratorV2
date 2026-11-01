@@ -18,6 +18,9 @@ class SceneSpeechComposerTest {
   assertEquals(1f,SceneSpeechComposer.pitchFor("Narrator",true),0.0001f)
   assertEquals(SceneSpeechComposer.pitchFor("Mia"),SceneSpeechComposer.pitchFor("Mia"),0.0001f)
   assertTrue(SceneSpeechComposer.pitchFor("Mia") in .92f..1.08f)
+  assertEquals(SceneSpeechComposer.speakerIdFor("Mia"),SceneSpeechComposer.speakerIdFor("Mia"))
+  assertEquals(0,SceneSpeechComposer.speakerIdFor("Narrator",true))
+  assertTrue(SceneSpeechComposer.speakerIdFor("Mia") in 1..10)
  }
  @Test fun wavClipsCanBeJoinedWithoutLosingAudioBytes(){
   val dir=Files.createTempDirectory("vex-wav-join").toFile()

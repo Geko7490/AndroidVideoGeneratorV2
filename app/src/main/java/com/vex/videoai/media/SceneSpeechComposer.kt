@@ -18,14 +18,15 @@ object SceneSpeechComposer {
         if(isNarration)return 1f
         return when(abs(speaker.lowercase().hashCode()%3)){0->.92f;1->1f;else->1.08f}
     }
-    suspend fun synthesize(utterances:List<SceneUtterance>,output:File,rate:Float=1f,synthesizeClip:suspend (text:String,file:File,rate:Float,pitch:Float)->File):File {
+    fun speakerIdFor(speaker:String,isNarration:Boolean=false):Int = if(isNarration)0 else 1+abs(speaker.lowercase().hashCode()%10)
+    suspend fun synthesize(utterances:List<SceneUtterance>,output:File,rate:Float=1f,synthesizeClip:suspend (text:String,file:File,rate:Float,pitch:Float,speakerId:Int)->File):File {
         require(utterances.isNotEmpty()) { "This scene has no spoken lines." }
         val work=File(output.parentFile,output.nameWithoutExtension+"-clips").apply{deleteRecursively();mkdirs()}
         val clips=mutableListOf<File>()
         try {
             utterances.forEachIndexed{index,line->
                 val clip=File(work,"line-${index.toString().padStart(3,'0')}.wav")
-                synthesizeClip(line.text,clip,rate,pitchFor(line.speaker,line.isNarration))
+                synthesizeClip(line.text,clip,rate,pitchFor(line.speaker,line.isNarration),speakerIdFor(line.speaker,line.isNarration))
                 require(clip.isFile&&clip.length()>44L) { "Speech generation failed for ${line.speaker}." }
                 clips.add(clip)
             }

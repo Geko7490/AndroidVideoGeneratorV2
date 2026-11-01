@@ -30,7 +30,7 @@ class SequentialVideoProduction(private val context:Context) {
         var kokoro:KokoroEnglishSpeechEngine?=null
         var kokoroFallbackReason=""
         if(kokoroModel?.isFile==true&&kokoroModel.length()>1024L) {
-            val candidate=KokoroEnglishSpeechEngine(context,kokoroModel)
+            val candidate=KokoroEnglishSpeechEngine(context,kokoroModel,profile.threadsFor(cpuCount))
             try { candidate.initialize();kokoro=candidate }
             catch(error:Exception) { candidate.release();kokoroFallbackReason=error.message?: "Kokoro initialization failed" }
         }
@@ -48,8 +48,10 @@ class SequentialVideoProduction(private val context:Context) {
                 } else {
                     val spokenText=utterances.joinToString("\n"){it.text}
                     val estimatedRate=(spokenText.split(Regex("\\s+")).size/(scene.durationSeconds*2.5f)).coerceIn(.85f,1.25f)
-                    if(kokoro!=null)kokoro!!.synthesize(spokenText,audio,estimatedRate)
-                    else SceneSpeechComposer.synthesize(utterances,audio,estimatedRate){text,file,rate,pitch->androidSpeech.synthesize(text,file,rate=rate,pitch=pitch)}
+                    SceneSpeechComposer.synthesize(utterances,audio,estimatedRate){text,file,rate,pitch,speakerId->
+                        if(kokoro!=null)kokoro!!.synthesize(text,file,rate,speakerId)
+                        else androidSpeech.synthesize(text,file,rate=rate,pitch=pitch)
+                    }
                     WavDurationAligner.padToDuration(audio,scene.durationSeconds)
                     spokenSceneIndexes.add(index)
                 }
