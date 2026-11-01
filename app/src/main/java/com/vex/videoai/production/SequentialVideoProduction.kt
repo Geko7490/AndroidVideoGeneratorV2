@@ -8,6 +8,7 @@ import com.vex.videoai.data.VideoProject
 import com.vex.videoai.data.VideoScene
 import com.vex.videoai.media.AndroidEnglishSpeechEngine
 import com.vex.videoai.media.KokoroEnglishSpeechEngine
+import com.vex.videoai.media.SceneSpeechComposer
 import com.vex.videoai.media.Media3VideoExporter
 import com.vex.videoai.media.SilentWavWriter
 import com.vex.videoai.media.WhisperLocalEngine
