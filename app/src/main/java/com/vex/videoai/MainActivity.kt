@@ -194,7 +194,7 @@ class MainActivity:ComponentActivity(){
       if(modelManager.isDownloaded(localAsset))modelManager.fileFor(localAsset) else null,
       modelManager.fileFor(whisperAsset),
       if(modelManager.isDownloaded(kokoroAsset))modelManager.fileFor(kokoroAsset) else null,
-      profile,temp
+      profile,temp,outputResolution=exportResolution,outputFrameRate=exportFps.toInt()
      ){progress->pipelineProgress=progress;if(progress.stage==ProductionStage.RENDER)renderProgress=progress.completed}
      saveProject(produced);sceneIndex=0
     }else{

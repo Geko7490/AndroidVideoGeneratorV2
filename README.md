@@ -14,7 +14,7 @@ Offline-first Android video creation studio. The interface supports Turkish and 
 - Scenes without narration or dialogue retain their visual duration with a valid silent PCM WAV segment.
 - Canvas layers support PNG/JPEG/WebP image import, position, scale, visibility and layer type. Imported files are copied into app-private project storage and included in rendering.
 - Renderer samples frames at profile-dependent intervals, adds exact subtitle boundaries, applies subtle camera pan/zoom, and supports lightweight fade/dissolve/wipe effects.
-- MP4 export supports 480p–4K and 24/30/60 fps. Full production applies the selected profile's defaults.
+- MP4 export supports 480p–4K and 24/30/60 fps. Full production honors the selected resolution and frame rate; Low/Mid/High supply defaults when unchanged.
 - Scene sound-effect descriptions are saved as editable cues. They are not audio tracks yet.
 
 ## Performance profiles
