@@ -179,7 +179,7 @@ class MainActivity:ComponentActivity(){
   }
  }
  var pendingSrtFile by remember { mutableStateOf<File?>(null) }
- val srtPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/x-subrip")){uri->
+ val fullVideoSrtPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/x-subrip")){uri->
   val source=pendingSrtFile
   if(uri!=null&&source?.isFile==true){
    runCatching{
@@ -220,7 +220,7 @@ class MainActivity:ComponentActivity(){
      if(sidecar.isFile&&sidecar.length()>0L){
       pendingSrtFile=sidecar
       val safeName=projectToRender.title.replace(Regex("[^A-Za-z0-9_-]+"),"_").take(48).ifBlank{"video"}
-      srtPicker.launch("$safeName.srt")
+      fullVideoSrtPicker.launch("$safeName.srt")
      }else notice=if(tr)"MP4 kaydedildi; dışa aktarılacak altyazı bulunamadı." else "MP4 saved; there were no subtitle cues to export."
     }
    }catch(e:Exception){notice=(pipelineProgress?.stage?.label?.plus(" • ")?: "")+(e.message?: "Video production failed.")}
