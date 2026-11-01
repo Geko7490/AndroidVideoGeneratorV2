@@ -41,25 +41,20 @@ class SequentialVideoProduction(private val context:Context) {
             val voiced=mutableListOf<VideoScene>()
             val spokenSceneIndexes=mutableListOf<Int>()
             scenes.forEachIndexed{index,scene->
-                val spokenLines=buildList{
-                    if(scene.narration.isNotBlank())add(scene.narration)
-                    scene.dialogue.lines().forEach{line->
-                        val spoken=line.substringAfter(':',line).trim()
-                        if(spoken.isNotBlank())add(spoken)
-                    }
-                }
+                val utterances=SceneSpeechComposer.utterances(scene.narration,scene.dialogue)
                 val audio=File(audioDir,scene.id+"-voice.wav")
-                if(spokenLines.isEmpty()) {
+                if(utterances.isEmpty()) {
                     SilentWavWriter.write(audio,scene.durationSeconds)
                 } else {
-                    val spokenText=spokenLines.joinToString("\n")
+                    val spokenText=utterances.joinToString("\n"){it.text}
                     val estimatedRate=(spokenText.split(Regex("\\s+")).size/(scene.durationSeconds*2.5f)).coerceIn(.85f,1.25f)
-                    if(kokoro!=null)kokoro!!.synthesize(spokenText,audio,estimatedRate) else androidSpeech.synthesize(spokenText,audio,rate=estimatedRate)
+                    if(kokoro!=null)kokoro!!.synthesize(spokenText,audio,estimatedRate)
+                    else SceneSpeechComposer.synthesize(utterances,audio,estimatedRate){text,file,rate,pitch->androidSpeech.synthesize(text,file,rate=rate,pitch=pitch)}
                     WavDurationAligner.padToDuration(audio,scene.durationSeconds)
                     spokenSceneIndexes.add(index)
                 }
                 voiced.add(scene.copy(voiceoverPath=audio.absolutePath))
-                val detail=if(spokenLines.isEmpty())"Silent scene ${index+1}/${scenes.size}" else "${speechName} • ${index+1}/${scenes.size}"
+                val detail=if(utterances.isEmpty())"Silent scene ${index+1}/${scenes.size}" else "${speechName} • ${index+1}/${scenes.size}"
                 onProgress(ProductionProgress(ProductionStage.VOICEOVER,index+1,scenes.size,detail))
             }
             require(spokenSceneIndexes.isNotEmpty()) { "The storyboard contains no narration or dialogue. Regenerate it with spoken English content." }
