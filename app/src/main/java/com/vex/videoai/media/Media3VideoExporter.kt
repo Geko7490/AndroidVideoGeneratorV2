@@ -125,8 +125,8 @@ class Media3VideoExporter(context:Context) {
                 val end=interval.endMs
                 val caption=cues.firstOrNull { it.startMs<end && it.endMs>start }?.text.orEmpty()
                 val bitmap=drawScene(project,scene,caption,width,height,interval.progress)
-                val file=File(dir,"frame-${index.toString().padStart(4,'0')}.png");index++
-                FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
+                val file=File(dir,"frame-${index.toString().padStart(4,'0')}.jpg");index++
+                FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG,90,it) }
                 bitmap.recycle()
                 result.add(RenderFrame(file,end-start))
             }

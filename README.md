@@ -17,6 +17,7 @@ Offline-first Android video creation studio. The interface supports Turkish and 
 - On-device llama.cpp runtime for GGUF storyboard generation.
 - On-device Whisper English transcription with editable timestamped subtitle cues and SRT export.
 - Canvas layer controls and PNG/JPEG/WebP image import; assets are copied to app-private project storage and included in MP4 rendering.
+- The renderer samples scenes into short frames with subtitle-boundary accuracy and applies subtle Ken Burns-style zoom/pan from the camera direction; JPEG intermediate frames reduce temporary storage compared with PNG.
 - Media3 Transformer MP4 export with selectable 480p–4K resolution and 24/30/60 fps. Full production uses the selected profile preset.
 
 ## Performance profiles
