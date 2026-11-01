@@ -10,7 +10,7 @@ Offline-first Android video creation studio. The interface supports Turkish and 
 - Sequential pipeline: selected LLM → scene voiceover → Whisper tiny.en → MP4 export.
 - Selectable Qwen3 0.6B / 4B GGUF local models via llama.cpp. If the selected model is not downloaded, the configured OpenAI-compatible local server is used as a fallback.
 - Kokoro INT8 English runs fully offline through the sherpa-onnx Android runtime. Its 11 speaker IDs are assigned consistently to speaker-labelled dialogue; narration uses its own voice. Each utterance is generated separately and joined into a scene WAV.
-- Whisper tiny.en is loaded once for a batch of spoken scenes. Silent scenes are skipped; timestamped subtitle cues can be edited and exported as SRT.
+- Whisper tiny.en is loaded once for a batch of spoken scenes. Silent scenes are skipped; timestamped subtitle cues can be edited, exported as SRT, and saved automatically as an .srt sidecar beside each generated MP4.
 - Scenes without narration or dialogue retain their visual duration with a valid silent PCM WAV segment.
 - Canvas layers support PNG/JPEG/WebP image import, position, scale, visibility and layer type. Imported files are copied into app-private project storage and included in rendering.
 - Renderer samples frames at profile-dependent intervals, adds exact subtitle boundaries, applies subtle camera pan/zoom, and supports lightweight fade/dissolve/wipe effects.

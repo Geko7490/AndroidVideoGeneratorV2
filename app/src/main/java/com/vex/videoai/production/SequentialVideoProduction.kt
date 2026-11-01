@@ -9,6 +9,7 @@ import com.vex.videoai.data.VideoScene
 import com.vex.videoai.media.AndroidEnglishSpeechEngine
 import com.vex.videoai.media.KokoroEnglishSpeechEngine
 import com.vex.videoai.media.SceneSpeechComposer
+import com.vex.videoai.media.SrtExporter
 import com.vex.videoai.media.Media3VideoExporter
 import com.vex.videoai.media.SilentWavWriter
 import com.vex.videoai.media.WhisperLocalEngine
@@ -79,6 +80,9 @@ class SequentialVideoProduction(private val context:Context) {
             }
             spokenSceneIndexes.forEachIndexed{batchIndex,sceneIndex->subtitlesByScene[sceneIndex]=subtitleBatches[batchIndex]}
             val completedProject=source.copy(scenes=voiced.mapIndexed{index,scene->scene.copy(subtitles=subtitlesByScene[index])})
+            val srtFile=File(outputFile.parentFile,outputFile.nameWithoutExtension+".srt")
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){srtFile.parentFile?.mkdirs();srtFile.writeText(SrtExporter.toSrtForScenes(completedProject.scenes))}
+            onProgress(ProductionProgress(ProductionStage.SUBTITLES,spokenSceneIndexes.size,spokenSceneIndexes.size,"SRT sidecar saved: ${srtFile.name}"))
             onProgress(ProductionProgress(ProductionStage.RENDER,0,1,"Rendering ${profile.defaultResolution} at ${profile.defaultFps} fps"))
             Media3VideoExporter(context).export(completedProject,outputFile,resolutionLongEdge=profile.defaultResolution.removeSuffix("p").toInt(),frameRate=profile.defaultFps.toInt(),frameStepMs=profile.frameStepMs){percent->onProgress(ProductionProgress(ProductionStage.RENDER,percent,100,"MP4 render $percent%"))}
             onProgress(ProductionProgress(ProductionStage.COMPLETE,4,4,"Video exported"))
