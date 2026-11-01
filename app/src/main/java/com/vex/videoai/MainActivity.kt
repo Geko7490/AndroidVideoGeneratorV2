@@ -178,6 +178,18 @@ class MainActivity:ComponentActivity(){
    }catch(e:Exception){notice=e.message?: "Image import failed."}
   }
  }
+ var pendingSrtFile by remember { mutableStateOf<File?>(null) }
+ val srtPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/x-subrip")){uri->
+  val source=pendingSrtFile
+  if(uri!=null&&source?.isFile==true){
+   runCatching{
+    val target=context.contentResolver.openOutputStream(uri)?:error("Could not write the SRT file.")
+    target.use{out->source.inputStream().use{input->input.copyTo(out)}}
+   }.onSuccess{notice=if(tr)"İngilizce altyazı SRT dosyası da kaydedildi." else "English subtitle SRT file saved too."}
+    .onFailure{notice=(if(tr)"MP4 kaydedildi; SRT kaydedilemedi: " else "MP4 saved; SRT export failed: ")+(it.message?: "Unknown error")}
+  }else if(uri==null){notice=if(tr)"MP4 kaydedildi; SRT kaydetme iptal edildi." else "MP4 saved; SRT export was cancelled."}
+  source?.delete();pendingSrtFile=null
+ }
  val videoPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")){uri->
   val projectToRender=active
   if(uri!=null&&projectToRender!=null)scope.launch{
@@ -202,7 +214,15 @@ class MainActivity:ComponentActivity(){
     }
     val output=context.contentResolver.openOutputStream(uri)?:error("Could not write to the selected destination.")
     output.use{stream->temp.inputStream().use{input->input.copyTo(stream)}}
-    notice=if(fullRun)if(tr)"Video baştan sona üretildi: senaryo, ses, Whisper altyazı ve MP4." else "Full production completed: script, voiceovers, Whisper subtitles and MP4." else if(tr)"MP4 dışa aktarıldı." else "MP4 exported."
+    notice=if(fullRun)if(tr)"Video üretildi; şimdi SRT altyazı dosyasının konumunu seç." else "Video generated; choose where to save the SRT subtitle file." else if(tr)"MP4 dışa aktarıldı." else "MP4 exported."
+    if(fullRun){
+     val sidecar=File(temp.parentFile,temp.nameWithoutExtension+".srt")
+     if(sidecar.isFile&&sidecar.length()>0L){
+      pendingSrtFile=sidecar
+      val safeName=projectToRender.title.replace(Regex("[^A-Za-z0-9_-]+"),"_").take(48).ifBlank{"video"}
+      srtPicker.launch("$safeName.srt")
+     }else notice=if(tr)"MP4 kaydedildi; dışa aktarılacak altyazı bulunamadı." else "MP4 saved; there were no subtitle cues to export."
+    }
    }catch(e:Exception){notice=(pipelineProgress?.stage?.label?.plus(" • ")?: "")+(e.message?: "Video production failed.")}
    finally{temp.delete();busy=false;productionPending=false}
   }else productionPending=false
