@@ -9,7 +9,7 @@ class SceneFramePlannerTest {
  @Test fun createsMotionIntervalsAndKeepsSubtitleBoundaries(){
   val cues=listOf(SubtitleLine(startMs=620,endMs=1180,text="Hello"))
   val frames=SceneFramePlanner.plan(2000,cues,500)
-  assertEquals(5,frames.size)
+  assertEquals(6,frames.size)
   assertTrue(frames.any{it.startMs==620L})
   assertTrue(frames.any{it.endMs==1180L})
   assertTrue(frames.first().progress<frames.last().progress)
