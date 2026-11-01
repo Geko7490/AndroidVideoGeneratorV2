@@ -23,7 +23,8 @@ Offline-first Android video creation studio. The interface supports Turkish and 
 ## Performance profiles
 - Low: 2 LLM threads, 2048 context, 1100 token budget, 720p/24 fps.
 - Mid: up to 4 LLM threads, 4096 context, 1800 token budget, 1080p/30 fps.
-- High: up to 8 LLM threads, 6144 context, 2800 token budget, 1080p/60 fps.
+- High: up to 8 LLM threads, 6144 context, 2800 token budget, 1080p/60 fps, and 4 camera-motion samples per second.
+- Frame sampling also scales with the profile: Low 1 fps, Mid 2 fps, High 4 fps; subtitles add exact frame boundaries.
 - Actual LLM thread count is capped by available CPU cores. High may increase heat, battery use and memory pressure; it does not guarantee GPU acceleration.
 
 ## Known limitations

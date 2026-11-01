@@ -37,12 +37,12 @@ private data class RenderFrame(val file:File,val durationMs:Long)
 class Media3VideoExporter(context:Context) {
     private val app=context.applicationContext
 
-    suspend fun export(project:VideoProject,outputFile:File,resolutionLongEdge:Int=1080,frameRate:Int=30,onProgress:(Int)->Unit={}):File {
+    suspend fun export(project:VideoProject,outputFile:File,resolutionLongEdge:Int=1080,frameRate:Int=30,frameStepMs:Long=500L,onProgress:(Int)->Unit={}):File {
         require(project.scenes.isNotEmpty()) { "Add at least one scene before exporting." }
         outputFile.parentFile?.mkdirs()
         val workDir=File(app.cacheDir,"vex-render-${project.id}").apply { deleteRecursively();mkdirs() }
         return try {
-            val frames=withContext(Dispatchers.IO) { renderFrames(project,workDir,resolutionLongEdge.coerceIn(480,3840)) }
+            val frames=withContext(Dispatchers.IO) { renderFrames(project,workDir,resolutionLongEdge.coerceIn(480,3840),frameStepMs) }
             withContext(Dispatchers.Main.immediate) { onProgress(25) }
             val items=frames.map { frame ->
                 val mediaItem=MediaItem.Builder().setUri(frame.file.toUri()).setImageDurationMs(frame.durationMs).build()
@@ -109,7 +109,7 @@ class Media3VideoExporter(context:Context) {
         }
     }
 
-    private fun renderFrames(project:VideoProject,dir:File,longEdge:Int):List<RenderFrame> {
+    private fun renderFrames(project:VideoProject,dir:File,longEdge:Int,frameStepMs:Long):List<RenderFrame> {
         val dimensions=VideoOutputDimensions.resolve(project.aspectRatio,longEdge)
         val width=dimensions.width
         val height=dimensions.height
@@ -120,7 +120,7 @@ class Media3VideoExporter(context:Context) {
             val cues=scene.subtitles.filter { it.text.isNotBlank() && it.endMs>it.startMs }
                 .map { it.copy(startMs=it.startMs.coerceIn(0,totalMs),endMs=it.endMs.coerceIn(0,totalMs)) }
                 .filter { it.endMs>it.startMs }
-            SceneFramePlanner.plan(totalMs,cues).forEach { interval ->
+            SceneFramePlanner.plan(totalMs,cues,frameStepMs).forEach { interval ->
                 val start=interval.startMs
                 val end=interval.endMs
                 val caption=cues.firstOrNull { it.startMs<end && it.endMs>start }?.text.orEmpty()

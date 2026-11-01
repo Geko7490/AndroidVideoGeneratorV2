@@ -70,7 +70,7 @@ class SequentialVideoProduction(private val context:Context) {
             spokenSceneIndexes.forEachIndexed{batchIndex,sceneIndex->subtitlesByScene[sceneIndex]=subtitleBatches[batchIndex]}
             val completedProject=source.copy(scenes=voiced.mapIndexed{index,scene->scene.copy(subtitles=subtitlesByScene[index])})
             onProgress(ProductionProgress(ProductionStage.RENDER,0,1,"Rendering ${profile.defaultResolution} at ${profile.defaultFps} fps"))
-            Media3VideoExporter(context).export(completedProject,outputFile,resolutionLongEdge=profile.defaultResolution.removeSuffix("p").toInt(),frameRate=profile.defaultFps.toInt()){percent->onProgress(ProductionProgress(ProductionStage.RENDER,percent,100,"MP4 render $percent%"))}
+            Media3VideoExporter(context).export(completedProject,outputFile,resolutionLongEdge=profile.defaultResolution.removeSuffix("p").toInt(),frameRate=profile.defaultFps.toInt(),frameStepMs=profile.frameStepMs){percent->onProgress(ProductionProgress(ProductionStage.RENDER,percent,100,"MP4 render $percent%"))}
             onProgress(ProductionProgress(ProductionStage.COMPLETE,4,4,"Video exported"))
             return completedProject
         } finally { kokoro?.release() }
