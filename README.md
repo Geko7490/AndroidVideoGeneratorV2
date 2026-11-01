@@ -29,7 +29,8 @@ Offline-first Android video creation studio. The interface supports Turkish and 
 ## Known limitations
 - The current free Kokoro Android AAR bundles one voice; multi-speaker character voice assignment is not yet implemented.
 - Voiceover clip durations are not yet automatically time-stretched to exact scene duration; unusually long speech may extend beyond its visual beat.
-- Camera movement and transitions are storyboard metadata; animated camera effects and transition rendering are not yet complete.
+- Camera direction now drives subtle pan/zoom motion and fade/dissolve/wipe scene effects in the frame renderer. These are lightweight 2D moves, not full 3D animation.
+- Sound effects are generated and saved as editable scene cues, but a dedicated SFX synthesis/mixing engine is not integrated yet.
 - Imported image assets and native vector placeholders are supported; AI image generation is not integrated.
 - Detailed audio mixing, device-specific memory safeguards, cancellation and physical-device testing remain.
 

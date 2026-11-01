@@ -191,6 +191,16 @@ class Media3VideoExporter(context:Context) {
             }
         }
         canvas.restore()
+        val transition=scene.transition.lowercase()
+        if(transition.contains("fade")||transition.contains("dissolve")) {
+            val fadeIn=(progress/.09f).coerceIn(0f,1f)
+            val fadeOut=((1f-progress)/.09f).coerceIn(0f,1f)
+            val alpha=((1f-minOf(fadeIn,fadeOut))*235).toInt().coerceIn(0,235)
+            if(alpha>0){paint.color=AndroidColor.argb(alpha,0,0,0);canvas.drawRect(0f,0f,width.toFloat(),height.toFloat(),paint)}
+        } else if(transition.contains("wipe")) {
+            paint.color=AndroidColor.BLACK
+            canvas.drawRect(0f,0f,width*(1f-progress),height.toFloat(),paint)
+        }
         paint.color=AndroidColor.WHITE
         paint.textSize=width*.055f
         paint.typeface=android.graphics.Typeface.create("sans-serif-bold",android.graphics.Typeface.BOLD)

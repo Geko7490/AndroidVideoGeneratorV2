@@ -42,7 +42,8 @@ class OnDeviceLlmClient(private val context:Context) {
                 for(i in 0 until backgrounds.length())add(SceneLayer(name=backgrounds.optString(i),kind="background",x=.5f,y=.35f,scale=(1f+i*.12f).coerceAtMost(1.8f)))
                 for(i in 0 until foregrounds.length())add(SceneLayer(name=foregrounds.optString(i),kind="foreground",x=.25f+(i%3)*.25f,y=.58f+(i/3)*.12f,scale=1f))
             }
-            VideoScene(title=s.optString("title","Scene ${index+1}"),durationSeconds=s.optInt("durationSeconds",6).coerceIn(1,120),narration=s.optString("narration"),dialogue=dialogue,visualDescription=s.optString("visualDescription"),cameraMovement=s.optString("cameraMovement","Static"),transition=s.optString("transition","Cut"),layers=layers)
+            val soundArray=s.optJSONArray("soundEffects")?:JSONArray();val soundEffects=(0 until soundArray.length()).map{soundArray.optString(it)}.filter{it.isNotBlank()}
+            VideoScene(title=s.optString("title","Scene ${index+1}"),durationSeconds=s.optInt("durationSeconds",6).coerceIn(1,120),narration=s.optString("narration"),dialogue=dialogue,visualDescription=s.optString("visualDescription"),cameraMovement=s.optString("cameraMovement","Static"),transition=s.optString("transition","Cut"),layers=layers,soundEffects=soundEffects)
         }}
         require(parsed.isNotEmpty()) { "The on-device model returned no usable scenes." }
         require(parsed.all{scene->listOf(scene.narration,scene.dialogue,scene.visualDescription,scene.title,scene.cameraMovement,scene.transition).all{value->value.all{it.code<128}}&&scene.layers.all{layer->layer.name.all{it.code<128}}}) { "The model generated non-English video content. Retry; output must be English." }
