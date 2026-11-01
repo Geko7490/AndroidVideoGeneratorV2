@@ -73,6 +73,7 @@ class SequentialVideoProduction(private val context:Context) {
                 val detail=if(utterances.isEmpty())"Silent scene ${index+1}/${scenes.size}" else "${speechName} • ${index+1}/${scenes.size}"
                 onProgress(ProductionProgress(ProductionStage.VOICEOVER,index+1,scenes.size,detail))
             }
+            kokoro?.release();kokoro=null
             require(spokenSceneIndexes.isNotEmpty()) { "The storyboard contains no narration or dialogue. Regenerate it with spoken English content." }
             val subtitlesByScene=MutableList(scenes.size){emptyList<SubtitleLine>()}
             val subtitleBatches=WhisperLocalEngine(context).transcribeEnglishBatch(spokenSceneIndexes.map{File(voiced[it].voiceoverPath)},whisperModel){completed,total->
